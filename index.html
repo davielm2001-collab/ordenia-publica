@@ -453,7 +453,7 @@
 
         <div class="local-note">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-          <span><strong>Es tu cuenta personal en este dispositivo.</strong> Tus datos se guardan solo en el navegador de este móvil u ordenador: no se suben a ningún servidor y nadie más puede verlos. La clave solo separa tu perfil de otros perfiles en este mismo aparato; si borras los datos del navegador, se pierde todo, así que descarga una copia de seguridad de vez en cuando desde dentro.</span>
+          <span><strong>Es tu cuenta personal en este dispositivo.</strong> Tus datos se guardan solo en el navegador de este móvil u ordenador: no se suben a ningún servidor y nadie más puede verlos. La clave solo separa tu perfil de otros perfiles en este mismo aparato; si borras los datos del navegador, se pierde todo, así que descarga tus datos de vez en cuando desde «Exportar mis datos», dentro.</span>
         </div>
       </div>
     </div>
@@ -580,18 +580,18 @@
             </div>
 
             <div class="card">
-              <h3>Copia de seguridad</h3>
-              <p class="csub">Todo vive solo en este dispositivo. Descarga una copia de tus datos para guardarlos donde quieras, o importa una copia anterior en este u otro aparato.</p>
+              <h3>Exportar mis datos</h3>
+              <p class="csub">Descarga un informe claro y legible, en tablas, con <strong>todos tus movimientos</strong> (fecha, tipo, concepto, categoría, método e importe, con totales), tus documentos, tus recordatorios y tus inversiones. No es una copia de la web: son tus datos. Ese mismo archivo sirve para restaurar todo aquí o en otro aparato, y también puedes restaurar una copia antigua.</p>
               <div class="backup-row">
-                <button class="btn" id="exportBtn" type="button">
+                <button class="btn btn-primary" id="exportBtn" type="button">
                   <svg class="ic" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M4 20h16"/></svg>
-                  Descargar copia
+                  Descargar mis datos
                 </button>
                 <button class="btn" id="importBtn" type="button">
                   <svg class="ic" viewBox="0 0 24 24"><path d="M12 15V4M7 8l5-5 5 5M4 20h16"/></svg>
-                  Importar copia
+                  Restaurar desde archivo
                 </button>
-                <input class="hidden-file" id="importFile" type="file" accept="application/json,.json" />
+                <input class="hidden-file" id="importFile" type="file" accept="application/json,.json,text/html,.html" />
               </div>
               <p class="quick-feedback" id="importFeedback" role="status"></p>
             </div>
@@ -1998,19 +1998,136 @@
       });
       $("globalSearch").addEventListener("keydown", function(e){ if(e.key === "Escape") closeSearch(); });
 
-      /* ============ Copia de seguridad ============ */
+      /* ============ Exportar mis datos (informe en tablas) ============
+         Antes se descargaba un JSON crudo que en el móvil se veía como
+         código ilegible. Ahora «Descargar mis datos» genera un archivo
+         HTML autónomo, legible e imprimible, con tablas profesionales:
+         resumen con totales, movimientos (fecha, tipo, concepto,
+         categoría, método e importe), documentos, recordatorios e
+         inversiones. Dentro de ese mismo HTML va incrustado, en un
+         bloque <script type="application/json" id="ordenia-export-data">,
+         el payload completo: al importarlo, ORDENIA lo extrae y restaura
+         todo igual que con las copias antiguas. La importación sigue
+         aceptando también los JSON antiguos ya descargados. */
+      function slugName(name){
+        return String(name || "perfil").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "perfil";
+      }
+      function buildReportHTML(payload){
+        var data = normalizeData(payload.data);
+        var profile = payload.profile || "";
+        var exported = new Date(payload.exportedAt || Date.now());
+        var exportedLabel = isNaN(exported.getTime()) ? "" : exported.toLocaleString("es-ES", { day:"numeric", month:"long", year:"numeric", hour:"2-digit", minute:"2-digit" });
+        var movs = data.movements.slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); });
+        var tIng = 0, tGas = 0;
+        movs.forEach(function(m){ var a = Number(m.amount)||0; if(m.type === "ingreso") tIng += a; else tGas += a; });
+        var saldo = tIng - tGas;
+        var invInvertido = 0, invValor = 0;
+        data.investments.forEach(function(i){ invInvertido += (Number(i.qty)||0)*(Number(i.buyPrice)||0); invValor += (Number(i.qty)||0)*(Number(i.currentPrice)||0); });
+        var invResultado = invValor - invInvertido;
+
+        function movRows(){
+          if(!movs.length) return '<tr><td colspan="6" class="empty-cell">Sin registros</td></tr>';
+          return movs.map(function(m){
+            var isIng = m.type === "ingreso";
+            var amt = Number(m.amount)||0;
+            return "<tr>" +
+              "<td>" + esc(fmtDate(m.date)) + "</td>" +
+              '<td><span class="badge ' + (isIng ? "b-in" : "b-out") + '">' + (isIng ? "Ingreso" : "Gasto") + "</span></td>" +
+              "<td>" + esc(m.concept || "—") + "</td>" +
+              "<td>" + esc(m.category || "—") + "</td>" +
+              "<td>" + esc(m.method || "—") + "</td>" +
+              '<td class="num ' + (isIng ? "pos" : "neg") + '">' + (isIng ? "+" : "−") + esc(fmtEUR(amt).replace("-", "")) + "</td></tr>";
+          }).join("");
+        }
+        function docRows(){
+          if(!data.documents.length) return '<tr><td colspan="5" class="empty-cell">Sin registros</td></tr>';
+          return data.documents.map(function(d){
+            return "<tr><td>" + esc(d.name || "—") + "</td><td>" + esc(d.type || "—") + "</td><td>" + esc(d.date ? fmtDate(d.date) : "—") + "</td><td>" + esc(d.location || "—") + "</td><td>" + esc(d.notes || "—") + "</td></tr>";
+          }).join("");
+        }
+        function remRows(){
+          if(!data.reminders.length) return '<tr><td colspan="5" class="empty-cell">Sin registros</td></tr>';
+          var today = todayStr();
+          var list = data.reminders.slice().sort(function(a,b){ return String(a.date||"").localeCompare(String(b.date||"")); });
+          return list.map(function(r){
+            var estado = r.done ? "Hecho" : (r.date && r.date < today ? "Vencido" : (r.date === today ? "Hoy" : "Pendiente"));
+            return "<tr><td>" + esc(r.title || "—") + "</td><td>" + esc(r.date ? fmtDate(r.date) : "—") + "</td><td>" + esc(r.time || "—") + "</td><td>" + esc(r.notes || "—") + '</td><td><span class="badge ' + (r.done ? "b-done" : "b-pend") + '">' + estado + "</span></td></tr>";
+          }).join("");
+        }
+        function invRows(){
+          if(!data.investments.length) return '<tr><td colspan="7" class="empty-cell">Sin registros</td></tr>';
+          return data.investments.map(function(i){
+            var qty = Number(i.qty)||0, buy = Number(i.buyPrice)||0, now = Number(i.currentPrice)||0;
+            var inv = qty*buy, val = qty*now, res = val-inv;
+            return "<tr><td>" + esc(i.name || "—") + "</td><td>" + esc(i.kind || "—") + '</td><td class="num">' + esc(String(qty).replace(".", ",")) + '</td><td class="num">' + esc(fmtEUR(buy)) + '</td><td class="num">' + esc(fmtEUR(now)) + '</td><td class="num">' + esc(fmtEUR(val)) + '</td><td class="num ' + (res > 0 ? "pos" : (res < 0 ? "neg" : "")) + '">' + (res > 0 ? "+" : "") + esc(fmtEUR(res)) + "</td></tr>";
+          }).join("");
+        }
+        var safeJson = JSON.stringify(payload).replace(/</g, "\\u003c");
+        var css =
+          "*{box-sizing:border-box}body{margin:0;background:#f6f5fb;color:#17122b;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5}" +
+          ".wrap{max-width:980px;margin:0 auto;padding:28px 18px 48px}" +
+          "header.top{border-bottom:3px solid #7c3aed;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-end}" +
+          ".brand{font-weight:800;letter-spacing:.14em;color:#7c3aed;font-size:.85rem}.brand+h1{margin:.2rem 0 .3rem;font-size:1.7rem;line-height:1.2} .meta{color:#5b5470;font-size:.92rem;margin:0}" +
+          ".file-note{background:#fff;border:1px solid #e4def5;border-radius:12px;padding:12px 14px;font-size:.9rem;color:#453e5e;margin-bottom:20px}" +
+          ".summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:26px}" +
+          ".sum{background:#fff;border:1px solid #e4def5;border-radius:12px;padding:12px 14px}.sum .k{font-size:.78rem;font-weight:700;color:#6b6486;text-transform:uppercase;letter-spacing:.04em}.sum .v{font-size:1.25rem;font-weight:800;margin-top:2px}" +
+          "h2{font-size:1.15rem;margin:26px 0 6px} .sub{color:#5b5470;font-size:.9rem;margin:0 0 10px}" +
+          ".table-wrap{overflow-x:auto;background:#fff;border:1px solid #e4def5;border-radius:12px}" +
+          "table{border-collapse:collapse;width:100%;min-width:560px;font-size:.92rem} th{background:#efebff;text-align:left;padding:10px 12px;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:#3d335e;border-bottom:1px solid #ddd3f5;white-space:nowrap}" +
+          "td{padding:9px 12px;border-bottom:1px solid #eeeaf9;vertical-align:top} tbody tr:nth-child(even){background:#faf9fd} tbody tr:last-child td{border-bottom:none}" +
+          "tfoot td{font-weight:800;background:#f4f1ff;border-top:2px solid #ddd3f5}" +
+          ".num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap} th.num{text-align:right}" +
+          ".pos{color:#0a7a4b!important}.neg{color:#c22545!important}" +
+          ".badge{display:inline-block;padding:.12rem .5rem;border-radius:999px;font-size:.78rem;font-weight:700;white-space:nowrap}.b-in{background:#dcf7e9;color:#0a7a4b}.b-out{background:#ffe1e8;color:#a11c3a}.b-done{background:#e6e2f2;color:#4a4370}.b-pend{background:#fff1cf;color:#7a5600}" +
+          ".empty-cell{color:#6b6486;text-align:center;padding:16px}" +
+          "footer{margin-top:30px;color:#6b6486;font-size:.85rem;border-top:1px solid #e4def5;padding-top:14px}" +
+          "@media print{body{background:#fff}.wrap{padding:0}.table-wrap{overflow:visible}table{min-width:0;font-size:.85rem}}";
+        return "<!doctype html>\n<html lang=\"es\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n<title>Mis datos de ORDENIA — " + esc(profile) + "</title>\n<style>" + css + "</style>\n</head>\n<body>\n<div class=\"wrap\">\n" +
+          "<header class=\"top\"><div><div class=\"brand\">ORDENIA</div><h1>Mis datos — Informe completo</h1><p class=\"meta\">Perfil: <strong>" + esc(profile) + "</strong>" + (exportedLabel ? " · Exportado el " + esc(exportedLabel) : "") + "</p></div></header>\n" +
+          "<p class=\"file-note\"><strong>Qué es este archivo:</strong> un informe legible con todos tus movimientos, documentos, recordatorios e inversiones registrados en ORDENIA. Guárdalo donde quieras. También sirve para restaurar tus datos: en ORDENIA, pulsa «Restaurar desde archivo» y elige este mismo archivo.</p>\n" +
+          "<section class=\"summary\">" +
+          "<div class=\"sum\"><div class=\"k\">Saldo</div><div class=\"v\">" + esc(fmtEUR(saldo)) + "</div></div>" +
+          "<div class=\"sum\"><div class=\"k\">Total ingresos</div><div class=\"v pos\">" + esc(fmtEUR(tIng)) + "</div></div>" +
+          "<div class=\"sum\"><div class=\"k\">Total gastos</div><div class=\"v neg\">" + esc(fmtEUR(tGas)) + "</div></div>" +
+          "<div class=\"sum\"><div class=\"k\">Movimientos</div><div class=\"v\">" + movs.length + "</div></div>" +
+          "<div class=\"sum\"><div class=\"k\">Valor inversiones</div><div class=\"v\">" + esc(fmtEUR(invValor)) + "</div></div>" +
+          "</section>\n" +
+          "<h2>Movimientos</h2><p class=\"sub\">Todos tus ingresos y gastos registrados, del más reciente al más antiguo.</p>" +
+          "<div class=\"table-wrap\"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Categoría</th><th>Método</th><th class=\"num\">Importe</th></tr></thead><tbody>" + movRows() + "</tbody>" +
+          (movs.length ? "<tfoot><tr><td colspan=\"5\">Totales — Ingresos: " + esc(fmtEUR(tIng)) + " · Gastos: " + esc(fmtEUR(tGas)) + "</td><td class=\"num\">Saldo: " + esc(fmtEUR(saldo)) + "</td></tr></tfoot>" : "") +
+          "</table></div>\n" +
+          "<h2>Documentos</h2><p class=\"sub\">Tu índice de documentos: qué son y dónde los guardas.</p>" +
+          "<div class=\"table-wrap\"><table><thead><tr><th>Documento</th><th>Tipo</th><th>Fecha</th><th>Dónde está guardado</th><th>Notas</th></tr></thead><tbody>" + docRows() + "</tbody></table></div>\n" +
+          "<h2>Recordatorios</h2><p class=\"sub\">Tus recordatorios, con su estado.</p>" +
+          "<div class=\"table-wrap\"><table><thead><tr><th>Recordatorio</th><th>Fecha</th><th>Hora</th><th>Notas</th><th>Estado</th></tr></thead><tbody>" + remRows() + "</tbody></table></div>\n" +
+          "<h2>Inversiones</h2><p class=\"sub\">Tus posiciones con los precios que apuntaste en ORDENIA.</p>" +
+          "<div class=\"table-wrap\"><table><thead><tr><th>Nombre</th><th>Tipo</th><th class=\"num\">Cantidad</th><th class=\"num\">Precio compra</th><th class=\"num\">Precio actual</th><th class=\"num\">Valor actual</th><th class=\"num\">Resultado</th></tr></thead><tbody>" + invRows() + "</tbody>" +
+          (data.investments.length ? "<tfoot><tr><td colspan=\"5\">Totales — Invertido: " + esc(fmtEUR(invInvertido)) + "</td><td class=\"num\">" + esc(fmtEUR(invValor)) + "</td><td class=\"num " + (invResultado > 0 ? "pos" : (invResultado < 0 ? "neg" : "")) + "\">" + (invResultado > 0 ? "+" : "") + esc(fmtEUR(invResultado)) + "</td></tr></tfoot>" : "") +
+          "</table></div>\n" +
+          "<footer>Generado por ORDENIA pública para " + esc(profile) + ". Tus datos viven solo en tu dispositivo; este archivo es la copia legible que tú decides guardar o compartir.</footer>\n" +
+          "</div>\n<script type=\"application/json\" id=\"ordenia-export-data\">" + safeJson + "<\/script>\n</body>\n</html>";
+      }
       $("exportBtn").addEventListener("click", function(){
         if(!current) return;
-        var payload = { app: "ORDENIA pública", version: 1, profile: current.name,
+        var payload = { app: "ORDENIA pública", version: 2, profile: current.name,
           exportedAt: new Date().toISOString(), data: D() };
-        var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        var html = buildReportHTML(payload);
+        var blob = new Blob([html], { type: "text/html;charset=utf-8" });
         var a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "ordenia-copia-" + current.name.toLowerCase().replace(/[^a-z0-9]+/gi, "-") + ".json";
+        a.download = "ordenia-mis-datos-" + slugName(current.name) + ".html";
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
-        toast("Copia descargada. Guárdala donde quieras: es solo tuya.");
+        toast("Tus datos descargados en tablas. Ese archivo también sirve para restaurar.");
       });
+      function parseExportFile(raw){
+        var t = String(raw || "").trim();
+        if(!t) throw new Error("vacío");
+        if(t.charAt(0) === "{") return JSON.parse(t);
+        var m = t.match(/<script[^>]*id=["']ordenia-export-data["'][^>]*>([\s\S]*?)<\/script>/i);
+        if(m && m[1] && m[1].trim()) return JSON.parse(m[1].trim());
+        return JSON.parse(t);
+      }
       $("importBtn").addEventListener("click", function(){ $("importFile").click(); });
       $("importFile").addEventListener("change", function(){
         var file = $("importFile").files[0];
@@ -2019,7 +2136,7 @@
         var reader = new FileReader();
         reader.onload = function(){
           try{
-            var parsed = JSON.parse(String(reader.result));
+            var parsed = parseExportFile(reader.result);
             var candidate = parsed && parsed.data ? parsed.data : parsed;
             var hasData = candidate && typeof candidate === "object" &&
               ["movements","documents","reminders","investments"].some(function(k){ return Array.isArray(candidate[k]); });
@@ -2027,11 +2144,11 @@
             current.data = normalizeData(candidate);
             persist(); renderAll();
             fb.className = "quick-feedback ok"; fb.style.color = "";
-            fb.textContent = "Copia importada: ahora este perfil muestra los datos del archivo.";
-            toast("Copia importada correctamente.");
+            fb.textContent = "Datos restaurados: ahora este perfil muestra los movimientos, documentos, recordatorios e inversiones del archivo.";
+            toast("Datos restaurados correctamente.");
           }catch(e){
             fb.className = "quick-feedback"; fb.style.color = "var(--red)";
-            fb.textContent = "Ese archivo no es una copia válida de ORDENIA.";
+            fb.textContent = "Ese archivo no es válido. Usa el archivo que descarga «Descargar mis datos» o una copia antigua de ORDENIA.";
           }
           $("importFile").value = "";
         };
