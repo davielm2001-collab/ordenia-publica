@@ -33,6 +33,11 @@
         --shadow:0 18px 50px rgba(0,0,0,.45);
       }
       *{ box-sizing:border-box; }
+      /* Sin esta regla, el atributo hidden no oculta los elementos cuya
+         clase ya fija un display (los .btn son inline-flex): pasaba con
+         «Crear otro perfil» en la pantalla de entrada y con «Cancelar
+         edición» en Dinero, que se quedaban visibles estando ocultos. */
+      [hidden]{ display:none !important; }
       html,body{ height:100%; }
       body{
         margin:0;
@@ -276,6 +281,19 @@
       .doc-card .dnotes{ font-size:.86rem; color:var(--muted); line-height:1.5; word-break:break-word; }
       .doc-card .icon-btn{ margin-left:auto; }
       .filters-row{ display:grid; grid-template-columns:1fr 180px 160px; gap:.7rem; margin-bottom:.6rem; }
+      .filters-row2{ display:grid; grid-template-columns:1fr 1fr; gap:.7rem; margin-bottom:.6rem; }
+      .doc-expiry{ font-weight:700; }
+      .doc-expiry.soon{ color:var(--amber); }
+      .doc-expiry.past{ color:var(--red); }
+      .cat-bar-row{ margin-bottom:.75rem; }
+      .cat-bar-row:last-child{ margin-bottom:0; }
+      .cat-bar-row .cb-head{ display:flex; justify-content:space-between; gap:.8rem; font-size:.88rem; font-weight:700; margin-bottom:.3rem; }
+      .cat-bar-row .cb-head span:last-child{ color:var(--muted); font-weight:600; }
+      .cat-bar{ height:8px; border-radius:99px; background:var(--surface-3); overflow:hidden; }
+      .cat-bar > div{ height:100%; background:var(--accent); border-radius:99px; }
+      /* El toast contenedor es pointer-events:none (solo informa); el
+         botón Deshacer lo reactiva para sí, o no se podría pulsar. */
+      #toastUndo{ color:var(--accent-text); padding:.1rem .35rem; min-height:0; margin-left:.35rem; font-size:.92rem; pointer-events:auto; }
       .price-edit{ display:flex; gap:.45rem; align-items:center; }
       .price-edit input{ width:110px; background:var(--bg-soft); border:1px solid var(--line); border-radius:10px; padding:.4rem .6rem; min-height:2.4rem; }
       .chart-wrap{ width:100%; }
@@ -320,9 +338,14 @@
         .main{ padding:1.1rem .95rem 6.5rem; }
         .form-grid{ grid-template-columns:1fr; }
         .filters-row{ grid-template-columns:1fr; }
+        .filters-row2{ grid-template-columns:1fr; }
+        .toast{ bottom:5.4rem; }
         .topbar h2{ font-size:1.35rem; }
         .topbar .searchbox{ max-width:none; flex-basis:100%; margin-left:0; order:3; }
         .auth-card{ padding:1.6rem 1.2rem 1.3rem; }
+      }
+      @media (max-width: 640px){
+        #invStats{ grid-template-columns:1fr !important; }
       }
       @media (prefers-reduced-motion: reduce){
         *{ transition:none !important; }
@@ -545,6 +568,12 @@
               </div>
             </div>
 
+            <div class="card" id="avisosCard" hidden style="border-color:rgba(251,191,36,.4)">
+              <div class="card-head"><h3>Avisos</h3></div>
+              <p class="csub">Lo vencido y lo que caduca pronto, sin tener que buscarlo sección por sección.</p>
+              <div id="avisosList"></div>
+            </div>
+
             <div class="card">
               <h3>Registro rápido</h3>
               <p class="csub">Escribe o dicta un movimiento y lo ordenamos por ti. Ej.: «Gasté 29 euros en gasolina ayer, con tarjeta» o «Cobré 1.200 euros de nómina». El importe también vale en palabras: si dictas «Gasté doscientos euros», lo entendemos igual.</p>
@@ -590,6 +619,10 @@
                 <button class="btn" id="importBtn" type="button">
                   <svg class="ic" viewBox="0 0 24 24"><path d="M12 15V4M7 8l5-5 5 5M4 20h16"/></svg>
                   Restaurar desde archivo
+                </button>
+                <button class="btn" id="exportCsvBtn" type="button">
+                  <svg class="ic" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 13h5M10 17h5"/></svg>
+                  Movimientos en CSV
                 </button>
                 <input class="hidden-file" id="importFile" type="file" accept="application/json,.json,text/html,.html" />
               </div>
@@ -640,7 +673,8 @@
                     <input id="movDate" type="date" required />
                   </div>
                   <div class="field" style="justify-content:flex-end">
-                    <button class="btn btn-primary btn-block" type="submit">Guardar movimiento</button>
+                    <button class="btn btn-primary btn-block" type="submit" id="movSubmitBtn">Guardar movimiento</button>
+                    <button class="btn btn-block" type="button" id="movCancelEdit" hidden>Cancelar edición</button>
                   </div>
                 </div>
                 <p class="form-error" id="movError" role="alert"></p>
@@ -651,6 +685,12 @@
               <h3>Ingresos y gastos · últimos 6 meses</h3>
               <p class="csub">Solo cuenta lo que tú registras en Dinero.</p>
               <div id="chartArea"></div>
+            </div>
+
+            <div class="card">
+              <h3>Gastos por categoría · este mes</h3>
+              <p class="csub">En qué se va el dinero este mes, de mayor a menor.</p>
+              <div id="catBreakdown"></div>
             </div>
 
             <div class="card">
@@ -673,6 +713,17 @@
                     <option value="">Ingresos y gastos</option>
                     <option value="ingreso">Solo ingresos</option>
                     <option value="gasto">Solo gastos</option>
+                  </select>
+                </div>
+              </div>
+              <div class="filters-row2">
+                <div class="field"><input id="movFilterMonth" type="month" aria-label="Filtrar por mes" /></div>
+                <div class="field">
+                  <select id="movFilterSort" aria-label="Ordenar movimientos">
+                    <option value="fecha-desc">Más recientes primero</option>
+                    <option value="fecha-asc">Más antiguos primero</option>
+                    <option value="importe-desc">Mayor importe primero</option>
+                    <option value="importe-asc">Menor importe primero</option>
                   </select>
                 </div>
               </div>
@@ -703,6 +754,10 @@
                   <div class="field">
                     <label for="docDate">Fecha del documento</label>
                     <input id="docDate" type="date" />
+                  </div>
+                  <div class="field">
+                    <label for="docExpiry">Caduca el (opcional)</label>
+                    <input id="docExpiry" type="date" />
                   </div>
                   <div class="field">
                     <label for="docLocation">Dónde está guardado</label>
@@ -747,6 +802,15 @@
                   <div class="field">
                     <label for="remTime">Hora (opcional)</label>
                     <input id="remTime" type="time" />
+                  </div>
+                  <div class="field">
+                    <label for="remRepeat">Repetir</label>
+                    <select id="remRepeat">
+                      <option value="">No se repite</option>
+                      <option value="semana">Cada semana</option>
+                      <option value="mes">Cada mes</option>
+                      <option value="año">Cada año</option>
+                    </select>
                   </div>
                   <div class="field">
                     <label for="remNotes">Notas</label>
@@ -846,6 +910,14 @@
       </div>
     </div>
 
+    <div class="confirm-box" id="importConfirmBox" hidden style="position:fixed; inset:auto 1rem 5.5rem auto; z-index:90; width:min(360px, calc(100vw - 2rem)); box-shadow:var(--shadow); background:var(--surface-2); border-color:var(--line)">
+      <p id="importConfirmText"><strong>Restaurar sustituirá los datos actuales de este perfil.</strong></p>
+      <div class="confirm-row">
+        <button class="btn btn-primary btn-small" id="confirmImport" type="button">Sí, restaurar</button>
+        <button class="btn btn-small" id="cancelImport" type="button">Cancelar</button>
+      </div>
+    </div>
+
     <div class="confirm-box" id="deleteFromAppBox" hidden style="position:fixed; inset:auto 1rem 5.5rem auto; z-index:90; max-width:360px; box-shadow:var(--shadow); background:var(--surface-2)">
       <p><strong>Se borrarán todos tus datos de este dispositivo</strong> (movimientos, documentos, recordatorios e inversiones) y el perfil dejará de existir aquí. No se puede deshacer.</p>
       <div class="confirm-row">
@@ -854,7 +926,7 @@
       </div>
     </div>
 
-    <div class="toast" id="toast" role="status"></div>
+    <div class="toast" id="toast" role="status"><span id="toastMsg"></span><button class="link-btn" id="toastUndo" type="button" hidden>Deshacer</button></div>
 
     <script>
       "use strict";
@@ -885,11 +957,36 @@
         return d.toLocaleDateString("es-ES",{ month:"short" }).replace(".","");
       }
       var toastTimer = null;
-      function toast(msg){
-        var t = $("toast"); t.textContent = msg; t.classList.add("show");
+      var toastUndoFn = null;
+      function showToast(ms){
+        var t = $("toast"); t.classList.add("show");
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 3200);
+        toastTimer = setTimeout(function(){
+          t.classList.remove("show");
+          toastUndoFn = null; $("toastUndo").hidden = true;
+        }, ms);
       }
+      function toast(msg){
+        toastUndoFn = null;
+        $("toastMsg").textContent = msg;
+        $("toastUndo").hidden = true;
+        showToast(3200);
+      }
+      /* Toast con «Deshacer»: los borrados dejan de ser irreversibles
+         por un toque equivocado. */
+      function toastUndoable(msg, undoFn){
+        toastUndoFn = undoFn;
+        $("toastMsg").textContent = msg;
+        $("toastUndo").hidden = false;
+        showToast(7000);
+      }
+      $("toastUndo").addEventListener("click", function(){
+        var fn = toastUndoFn; toastUndoFn = null;
+        clearTimeout(toastTimer);
+        $("toast").classList.remove("show");
+        $("toastUndo").hidden = true;
+        if(fn) fn();
+      });
       /* SHA-256 en JavaScript puro: da exactamente el mismo resultado que
          crypto.subtle, pero funciona en cualquier navegador y contexto.
          Antes la clave se resumía con crypto.subtle cuando estaba
@@ -977,15 +1074,64 @@
           if(raw){ var parsed = JSON.parse(raw); if(parsed && Array.isArray(parsed.profiles)) store = parsed; }
         }catch(e){ storageOK = false; }
       }
+      var saveWarned = false;
       function saveStore(){
         try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }
-        catch(e){ storageOK = false; }
+        catch(e){
+          storageOK = false;
+          /* Antes el fallo de guardado era silencioso y el usuario
+             descubría la pérdida al volver. Ahora avisa una vez y le
+             dice cómo ponerse a salvo: descargar sus datos. */
+          if(current && !saveWarned){
+            saveWarned = true;
+            toast("No se ha podido guardar en este dispositivo (sin espacio o sin permiso). Descarga tus datos desde «Exportar mis datos» para no perder lo último.");
+          }
+        }
       }
+      /* Sanea lo que entra (al cargar el almacén y al restaurar un
+         archivo): cada registro queda con su id y sus campos en el tipo
+         correcto, para que un archivo antiguo, editado a mano o de otra
+         versión nunca rompa las listas ni deje registros imposibles de
+         borrar. Lo que no es un registro válido se descarta. */
+      function isRecord(x){ return !!x && typeof x === "object" && !Array.isArray(x); }
+      function validDateStr(s){ return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ""; }
       function normalizeData(d){
         var base = emptyData();
         if(!d || typeof d !== "object") return base;
-        ["movements","documents","reminders","investments"].forEach(function(k){
-          if(Array.isArray(d[k])) base[k] = d[k];
+        if(Array.isArray(d.movements)) base.movements = d.movements.filter(isRecord).map(function(m){
+          return { id: m.id ? String(m.id) : uid(),
+            type: m.type === "ingreso" ? "ingreso" : "gasto",
+            concept: String(m.concept || "Movimiento"),
+            amount: Number(m.amount) || 0,
+            category: String(m.category || "Otros"),
+            method: String(m.method || ""),
+            date: validDateStr(m.date) || todayStr() };
+        });
+        if(Array.isArray(d.documents)) base.documents = d.documents.filter(isRecord).map(function(doc){
+          return { id: doc.id ? String(doc.id) : uid(),
+            name: String(doc.name || "Documento"),
+            type: String(doc.type || "Otro"),
+            date: validDateStr(doc.date),
+            expiry: validDateStr(doc.expiry),
+            location: String(doc.location || ""),
+            notes: String(doc.notes || "") };
+        });
+        if(Array.isArray(d.reminders)) base.reminders = d.reminders.filter(isRecord).map(function(r){
+          return { id: r.id ? String(r.id) : uid(),
+            title: String(r.title || "Recordatorio"),
+            date: validDateStr(r.date) || todayStr(),
+            time: typeof r.time === "string" ? r.time : "",
+            notes: String(r.notes || ""),
+            repeat: ["semana","mes","año"].indexOf(r.repeat) !== -1 ? r.repeat : "",
+            done: !!r.done };
+        });
+        if(Array.isArray(d.investments)) base.investments = d.investments.filter(isRecord).map(function(i){
+          return { id: i.id ? String(i.id) : uid(),
+            name: String(i.name || "Inversión"),
+            kind: String(i.kind || "Otro"),
+            qty: Number(i.qty) || 0,
+            buyPrice: Number(i.buyPrice) || 0,
+            currentPrice: Number(i.currentPrice) || 0 };
         });
         return base;
       }
@@ -1070,9 +1216,13 @@
          compartido, el siguiente perfil no puede ver ni restos del
          anterior, y cada perfil solo dibuja sus propios datos. */
       function clearRenderedData(){
-        ["resumenMovimientos","resumenRecordatorios","movementList","docList","remList","invList","chartArea","searchResults"].forEach(function(id){
+        ["resumenMovimientos","resumenRecordatorios","movementList","docList","remList","invList","chartArea","searchResults","catBreakdown","avisosList"].forEach(function(id){
           var el = $(id); if(el) el.innerHTML = "";
         });
+        $("avisosCard").hidden = true;
+        editingMovId = null;
+        var mf = $("movFilterMonth"); if(mf) mf.value = "";
+        var sf = $("movFilterSort"); if(sf) sf.value = "fecha-desc";
         ["statSaldo","statIngresos","statGastos","statInversiones","invValor","invInvertido","invResultado","movSummary"].forEach(function(id){
           var el = $(id); if(el) el.textContent = "";
         });
@@ -1087,6 +1237,8 @@
         if(typeof stopDictation === "function") stopDictation();
         $("changePinAppBox").hidden = true;
         $("deleteFromAppBox").hidden = true;
+        $("importConfirmBox").hidden = true;
+        pendingImport = null;
         current = null; pinTargetId = null;
         clearRenderedData();
         $("appScreen").style.display = "none";
@@ -1306,13 +1458,39 @@
         var d = D();
         setCount("countDinero", d.movements.length);
         setCount("countDocumentos", d.documents.length);
-        setCount("countRecordatorios", d.reminders.filter(function(r){ return !r.done; }).length);
+        var pending = d.reminders.filter(function(r){ return !r.done; });
+        setCount("countRecordatorios", pending.length);
+        /* Si hay recordatorios vencidos, el contador se tiñe de rojo:
+           se ve de un vistazo sin entrar en la sección. */
+        var today = todayStr();
+        var hasOverdue = pending.some(function(r){ return r.date < today; });
+        var rc = $("countRecordatorios");
+        rc.style.background = hasOverdue ? "rgba(251,113,133,.28)" : "";
+        rc.style.color = hasOverdue ? "#fda4af" : "";
         setCount("countInversiones", d.investments.length);
       }
       function setCount(id, n){ var el = $(id); el.hidden = !n; el.textContent = n; }
 
       function emptyBox(title, text){
         return '<div class="empty"><strong>' + esc(title) + '</strong>' + esc(text) + '</div>';
+      }
+      var warnIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4M12 17.2v.3"/></svg>';
+      var REPEAT_LABEL = { semana: "cada semana", mes: "cada mes", "año": "cada año" };
+      /* Al completar un recordatorio que se repite, su fecha salta a la
+         siguiente vez (avanzando las que hagan falta si llevaba tiempo
+         vencido) en vez de marcarse como hecho para siempre. */
+      function advanceReminderDate(dateStr, repeat){
+        var p = String(dateStr || "").split("-");
+        var d = new Date(Number(p[0]) || 2000, (Number(p[1]) || 1) - 1, Number(p[2]) || 1);
+        var today = todayStr(), guard = 0;
+        do{
+          if(repeat === "semana") d.setDate(d.getDate() + 7);
+          else if(repeat === "mes") d.setMonth(d.getMonth() + 1);
+          else if(repeat === "año") d.setFullYear(d.getFullYear() + 1);
+          else break;
+          guard++;
+        } while(todayStr(d) < today && guard < 1000);
+        return todayStr(d);
       }
       function arrowIcon(type){
         if(type === "ingreso") return '<svg viewBox="0 0 24 24" fill="none" stroke="#3ecf8e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
@@ -1324,7 +1502,8 @@
           '<span class="imain"><span class="ititle">' + esc(m.concept) + '</span><br />' +
           '<span class="imeta">' + esc(m.category) + " · " + fmtDate(m.date) + (m.method ? " · " + esc(m.method) : "") + '</span></span>' +
           '<span class="iamount num ' + (m.type === "ingreso" ? "pos" : "neg") + '">' + (m.type === "ingreso" ? "+" : "−") + fmtEUR(m.amount).replace("-", "") + '</span>' +
-          (showDelete ? '<button class="icon-btn danger" type="button" data-del="movement" data-id="' + m.id + '" aria-label="Eliminar movimiento"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' : "") +
+          (showDelete ? '<button class="icon-btn" type="button" data-edit-movement="' + m.id + '" aria-label="Editar movimiento"><svg class="ic" viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L8 20l-5 1 1-5L17 3z"/></svg></button>' +
+          '<button class="icon-btn danger" type="button" data-del="movement" data-id="' + m.id + '" aria-label="Eliminar movimiento"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' : "") +
           '</div>';
       }
       function reminderRow(r, showActions){
@@ -1336,7 +1515,7 @@
         return '<div class="item' + (r.done ? " done" : "") + (overdue ? " overdue" : "") + '">' +
           '<span class="iicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></span>' +
           '<span class="imain"><span class="ititle">' + esc(r.title) + '</span><br />' +
-          '<span class="imeta">' + esc(when) + (r.notes ? " · " + esc(r.notes) : "") + '</span></span>' +
+          '<span class="imeta">' + esc(when) + (r.repeat ? " · Se repite " + (REPEAT_LABEL[r.repeat] || "") : "") + (r.notes ? " · " + esc(r.notes) : "") + '</span></span>' +
           (showActions ?
             '<button class="btn btn-small" type="button" data-toggle-rem="' + r.id + '">' + (r.done ? "Reabrir" : "Hecho") + '</button>' +
             '<button class="icon-btn danger" type="button" data-del="reminder" data-id="' + r.id + '" aria-label="Eliminar recordatorio"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' : "") +
@@ -1376,11 +1555,72 @@
         $("resumenRecordatorios").innerHTML = next.length
           ? '<div class="item-list">' + next.map(function(r){ return reminderRow(r, false); }).join("") + '</div>'
           : emptyBox("Sin recordatorios pendientes", "Añade uno desde la sección Recordatorios: un pago, una cita, una renovación…");
-        void today;
+        renderAvisos(d, today);
+      }
+      /* Avisos del Resumen: recordatorios vencidos o de hoy y documentos
+         caducados o a punto de caducar (30 días), juntos y a la vista al
+         entrar, sin revisar sección por sección. */
+      function renderAvisos(d, today){
+        var lines = [];
+        d.reminders.filter(function(r){ return !r.done && r.date < today; })
+          .sort(function(a,b){ return a.date.localeCompare(b.date); }).forEach(function(r){
+            lines.push({ text: "<strong>Vencido:</strong> " + esc(r.title) + " · " + fmtDate(r.date), view: "recordatorios" });
+          });
+        d.reminders.filter(function(r){ return !r.done && r.date === today; }).forEach(function(r){
+          lines.push({ text: "<strong>Hoy:</strong> " + esc(r.title) + (r.time ? " · " + esc(r.time) : ""), view: "recordatorios" });
+        });
+        var limit = todayStr(new Date(Date.now() + 30 * 86400000));
+        d.documents.filter(function(doc){ return doc.expiry; })
+          .sort(function(a,b){ return a.expiry.localeCompare(b.expiry); }).forEach(function(doc){
+            if(doc.expiry < today) lines.push({ text: "<strong>Documento caducado:</strong> " + esc(doc.name) + " · caducó el " + fmtDate(doc.expiry), view: "documentos" });
+            else if(doc.expiry <= limit) lines.push({ text: "<strong>Caduca pronto:</strong> " + esc(doc.name) + " · " + fmtDate(doc.expiry), view: "documentos" });
+          });
+        var card = $("avisosCard");
+        card.hidden = !lines.length;
+        if(!lines.length){ $("avisosList").innerHTML = ""; return; }
+        $("avisosList").innerHTML = '<div class="item-list">' + lines.slice(0, 8).map(function(l){
+          return '<div class="item"><span class="iicon">' + warnIcon + '</span>' +
+            '<span class="imain"><span class="ititle" style="white-space:normal">' + l.text + '</span></span>' +
+            '<button class="btn btn-small" type="button" data-goto="' + l.view + '">Ver</button></div>';
+        }).join("") + '</div>';
       }
 
       /* ============ Dinero ============ */
       var movType = "gasto";
+      var editingMovId = null;
+      function setMovType(t){
+        movType = t;
+        document.querySelectorAll("#movTypeSeg button").forEach(function(x){
+          x.className = x.getAttribute("data-type") === movType ? ("on-" + movType) : "";
+        });
+      }
+      function resetMovEdit(){
+        editingMovId = null;
+        $("movSubmitBtn").textContent = "Guardar movimiento";
+        $("movCancelEdit").hidden = true;
+      }
+      /* Editar un movimiento: hasta ahora solo se podía borrar y volver
+         a crear. El lápiz de cada fila carga sus datos en el formulario
+         y el mismo botón pasa a «Guardar cambios». */
+      function startMovEdit(m){
+        editingMovId = m.id;
+        setMovType(m.type);
+        $("movConcept").value = m.concept;
+        $("movAmount").value = m.amount;
+        $("movCategory").value = m.category;
+        $("movMethod").value = m.method || "Tarjeta";
+        $("movDate").value = m.date;
+        $("movError").textContent = "";
+        $("movSubmitBtn").textContent = "Guardar cambios";
+        $("movCancelEdit").hidden = false;
+        $("movementForm").scrollIntoView({ behavior: "smooth", block: "start" });
+        setTimeout(function(){ $("movConcept").focus(); }, 60);
+      }
+      $("movCancelEdit").addEventListener("click", function(){
+        resetMovEdit();
+        $("movConcept").value = ""; $("movAmount").value = "";
+        $("movError").textContent = "";
+      });
       $("movTypeSeg").addEventListener("click", function(e){
         var b = e.target.closest("[data-type]"); if(!b) return;
         movType = b.getAttribute("data-type");
@@ -1397,27 +1637,70 @@
         if(!concept){ err.textContent = "Escribe un concepto."; return; }
         if(!(amount > 0)){ err.textContent = "El importe tiene que ser mayor que cero."; return; }
         if(!date){ err.textContent = "Elige una fecha."; return; }
+        if(editingMovId){
+          var em = D().movements.find(function(x){ return x.id === editingMovId; });
+          if(em){
+            em.type = movType; em.concept = concept; em.amount = amount;
+            em.category = $("movCategory").value; em.method = $("movMethod").value; em.date = date;
+            persist(); renderAll();
+            resetMovEdit();
+            $("movConcept").value = ""; $("movAmount").value = "";
+            toast("Movimiento actualizado: " + fmtEUR(amount));
+            return;
+          }
+          resetMovEdit();
+        }
         D().movements.push({ id: uid(), type: movType, concept: concept, amount: amount,
           category: $("movCategory").value, method: $("movMethod").value, date: date });
         persist(); renderAll();
         $("movConcept").value = ""; $("movAmount").value = "";
         toast((movType === "ingreso" ? "Ingreso" : "Gasto") + " guardado: " + fmtEUR(amount));
       });
-      ["movSearch","movFilterCat","movFilterType"].forEach(function(id){
+      ["movSearch","movFilterCat","movFilterType","movFilterMonth","movFilterSort"].forEach(function(id){
         $(id).addEventListener("input", renderDinero);
       });
+      /* Gastos por categoría del mes en curso, de mayor a menor, con el
+         porcentaje sobre el total del mes: la foto rápida de en qué se
+         va el dinero, sin salir de Dinero. */
+      function renderCatBreakdown(d){
+        var el = $("catBreakdown"); if(!el) return;
+        var mk = todayStr().slice(0,7);
+        var byCat = {}, total = 0;
+        d.movements.forEach(function(m){
+          if(m.type !== "gasto" || (m.date || "").slice(0,7) !== mk) return;
+          var a = Number(m.amount) || 0, c = m.category || "Otros";
+          byCat[c] = (byCat[c] || 0) + a;
+          total += a;
+        });
+        var cats = Object.keys(byCat).sort(function(a,b){ return byCat[b] - byCat[a]; });
+        el.innerHTML = cats.length
+          ? cats.map(function(c){
+              var pct = total > 0 ? Math.round(byCat[c] / total * 100) : 0;
+              return '<div class="cat-bar-row"><div class="cb-head"><span>' + esc(c) + '</span><span class="num">' + fmtEUR(byCat[c]) + " · " + pct + " %</span></div>" +
+                '<div class="cat-bar"><div style="width:' + pct + '%"></div></div></div>';
+            }).join("")
+          : emptyBox("Sin gastos este mes", "Cuando registres gastos, aquí verás el reparto por categoría.");
+      }
       function renderDinero(){
         if(!current) return;
         var d = D();
         renderChart(d);
+        renderCatBreakdown(d);
         var q = $("movSearch").value.trim().toLowerCase();
         var fc = $("movFilterCat").value, ft = $("movFilterType").value;
+        var fm = $("movFilterMonth").value, fs = $("movFilterSort").value;
         var list = d.movements.filter(function(m){
           if(fc && m.category !== fc) return false;
           if(ft && m.type !== ft) return false;
+          if(fm && (m.date || "").slice(0,7) !== fm) return false;
           if(q && (m.concept + " " + m.category + " " + (m.method||"")).toLowerCase().indexOf(q) === -1) return false;
           return true;
-        }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+        }).sort(function(a,b){
+          if(fs === "fecha-asc") return a.date.localeCompare(b.date);
+          if(fs === "importe-desc") return (Number(b.amount)||0) - (Number(a.amount)||0);
+          if(fs === "importe-asc") return (Number(a.amount)||0) - (Number(b.amount)||0);
+          return b.date.localeCompare(a.date);
+        });
         var tIng = 0, tGas = 0;
         list.forEach(function(m){ if(m.type === "ingreso") tIng += Number(m.amount)||0; else tGas += Number(m.amount)||0; });
         $("movSummary").textContent = d.movements.length
@@ -1487,7 +1770,8 @@
         var err = $("docError"); err.textContent = "";
         if(!name){ err.textContent = "Escribe el nombre del documento."; return; }
         D().documents.push({ id: uid(), name: name, type: $("docType").value,
-          date: $("docDate").value || "", location: $("docLocation").value.trim(), notes: $("docNotes").value.trim() });
+          date: $("docDate").value || "", expiry: $("docExpiry").value || "",
+          location: $("docLocation").value.trim(), notes: $("docNotes").value.trim() });
         persist(); renderAll();
         $("docForm").reset();
         toast("Documento guardado en tu índice.");
@@ -1503,8 +1787,11 @@
         });
         $("docList").innerHTML = list.length
           ? '<div class="doc-grid">' + list.map(function(doc){
+              var docToday = todayStr();
+              var docSoon = todayStr(new Date(Date.now() + 30 * 86400000));
               return '<div class="doc-card"><div class="dtop"><div><p class="dname">' + esc(doc.name) + '</p>' +
-                '<p class="dmeta">' + esc(doc.type) + (doc.date ? " · " + fmtDate(doc.date) : "") + '</p></div>' +
+                '<p class="dmeta">' + esc(doc.type) + (doc.date ? " · " + fmtDate(doc.date) : "") + '</p>' +
+                (doc.expiry ? '<p class="dmeta doc-expiry' + (doc.expiry < docToday ? " past" : (doc.expiry <= docSoon ? " soon" : "")) + '">Caduca: ' + fmtDate(doc.expiry) + (doc.expiry < docToday ? " · Ya caducó" : "") + '</p>' : "") + '</div>' +
                 '<button class="icon-btn danger" type="button" data-del="document" data-id="' + doc.id + '" aria-label="Eliminar documento"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>' +
                 (doc.location ? '<p class="dmeta">Guardado en: ' + esc(doc.location) + '</p>' : "") +
                 (doc.notes ? '<p class="dnotes">' + esc(doc.notes) + '</p>' : "") +
@@ -1523,7 +1810,7 @@
         if(!title){ err.textContent = "Escribe qué tienes que recordar."; return; }
         if(!date){ err.textContent = "Elige una fecha."; return; }
         D().reminders.push({ id: uid(), title: title, date: date, time: $("remTime").value || "",
-          notes: $("remNotes").value.trim(), done: false });
+          notes: $("remNotes").value.trim(), repeat: $("remRepeat").value || "", done: false });
         persist(); renderAll();
         $("remForm").reset(); $("remDate").value = todayStr();
         toast("Recordatorio guardado.");
@@ -1593,19 +1880,43 @@
 
       /* ============ Borrar / alternar (delegación) ============ */
       document.addEventListener("click", function(e){
+        var edm = e.target.closest("[data-edit-movement]");
+        if(edm && current){
+          var mv = D().movements.find(function(x){ return x.id === edm.getAttribute("data-edit-movement"); });
+          if(mv) startMovEdit(mv);
+          return;
+        }
         var del = e.target.closest("[data-del]");
         if(del && current){
           var kind = del.getAttribute("data-del"), id = del.getAttribute("data-id");
           var key = kind === "movement" ? "movements" : kind === "document" ? "documents" : kind === "reminder" ? "reminders" : "investments";
-          D()[key] = D()[key].filter(function(x){ return x.id !== id; });
+          var arr = D()[key];
+          var idx = arr.findIndex(function(x){ return x.id === id; });
+          if(idx === -1) return;
+          var removed = arr[idx];
+          arr.splice(idx, 1);
+          if(key === "movements" && editingMovId === id) resetMovEdit();
           persist(); renderAll();
-          toast("Eliminado.");
+          /* El borrado avisa con «Deshacer» durante unos segundos: el
+             registro vuelve a su sitio exacto si fue un toque errado. */
+          toastUndoable("Eliminado.", function(){
+            var target = D()[key];
+            target.splice(Math.min(idx, target.length), 0, removed);
+            persist(); renderAll();
+            toast("Restaurado.");
+          });
           return;
         }
         var tog = e.target.closest("[data-toggle-rem]");
         if(tog && current){
           var r = D().reminders.find(function(x){ return x.id === tog.getAttribute("data-toggle-rem"); });
-          if(r){ r.done = !r.done; persist(); renderAll(); }
+          if(r){
+            if(!r.done && r.repeat){
+              r.date = advanceReminderDate(r.date, r.repeat);
+              persist(); renderAll();
+              toast("Hecho. Se repite: el siguiente es el " + fmtDate(r.date) + ".");
+            } else { r.done = !r.done; persist(); renderAll(); }
+          }
           return;
         }
         var upd = e.target.closest("[data-upd-price]");
@@ -1732,12 +2043,16 @@
         else if(/transferencia/.test(t)) method = "Transferencia";
         else if(type === "ingreso") method = "Cuenta bancaria";
         var date = todayStr();
-        if(/ ayer /.test(t)) { var d1 = new Date(); d1.setDate(d1.getDate() - 1); date = todayStr(d1); }
-        if(/ mañana /.test(t)) { var d2 = new Date(); d2.setDate(d2.getDate() + 1); date = todayStr(d2); }
+        /* Con límites de palabra y no con espacios: en «ayer, con
+           tarjeta» (el ejemplo de la propia ayuda) la palabra lleva la
+           coma pegada y buscando « ayer » no se detectaba la fecha. */
+        if(/\banteayer\b/.test(t)) { var d0 = new Date(); d0.setDate(d0.getDate() - 2); date = todayStr(d0); }
+        else if(/\bayer\b/.test(t)) { var d1 = new Date(); d1.setDate(d1.getDate() - 1); date = todayStr(d1); }
+        if(/\bmañana\b/.test(t)) { var d2 = new Date(); d2.setDate(d2.getDate() + 1); date = todayStr(d2); }
         var concept = text.replace(amt.raw, " ")
           .replace(/€|euros?|eur/gi, " ")
           .replace(/\b(gast[eé]|pagu[eé]|compr[eé]|cobr[eé]|recib[ií]|ingres[eé]|me pagaron|me han pagado)(?=[\s,.;:]|$)/gi, " ")
-          .replace(/\b(con|en|por|de|la|el|ayer|hoy|mañana|tarjeta|efectivo|bizum|transferencia)\b/gi, " ")
+          .replace(/\b(con|en|por|de|la|el|anteayer|ayer|hoy|mañana|tarjeta|efectivo|bizum|transferencia)\b/gi, " ")
           .replace(/\s+/g, " ")
           .replace(/\s+([,.;:!?])/g, "$1")
           .replace(/^[,.;:\s]+|[,.;:\s]+$/g, "")
@@ -1997,6 +2312,13 @@
         if(!e.target.closest(".searchbox")) closeSearch();
       });
       $("globalSearch").addEventListener("keydown", function(e){ if(e.key === "Escape") closeSearch(); });
+      /* Escape también cierra las ventanas flotantes de la app. */
+      document.addEventListener("keydown", function(e){
+        if(e.key !== "Escape") return;
+        $("changePinAppBox").hidden = true;
+        $("deleteFromAppBox").hidden = true;
+        if(!$("importConfirmBox").hidden){ $("importConfirmBox").hidden = true; pendingImport = null; }
+      });
 
       /* ============ Exportar mis datos (informe en tablas) ============
          Antes se descargaba un JSON crudo que en el móvil se veía como
@@ -2120,6 +2442,27 @@
         setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
         toast("Tus datos descargados en tablas. Ese archivo también sirve para restaurar.");
       });
+      /* CSV de movimientos: para abrirlos en Excel, Numbers o Google
+         Sheets. Separador «;», comillas en cada celda y BOM inicial,
+         para que los acentos y las comas decimales se vean bien en las
+         hojas de cálculo en español. */
+      $("exportCsvBtn").addEventListener("click", function(){
+        if(!current) return;
+        function csvCell(v){ return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }
+        var rows = [["Fecha","Tipo","Concepto","Categoría","Método","Importe (€)"]];
+        D().movements.slice().sort(function(a,b){ return String(a.date||"").localeCompare(String(b.date||"")); }).forEach(function(m){
+          rows.push([m.date || "", m.type === "ingreso" ? "Ingreso" : "Gasto", m.concept || "",
+            m.category || "", m.method || "", String(Number(m.amount)||0).replace(".", ",")]);
+        });
+        var csv = "\ufeff" + rows.map(function(r){ return r.map(csvCell).join(";"); }).join("\r\n");
+        var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "ordenia-movimientos-" + slugName(current.name) + ".csv";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+        toast("Movimientos descargados en CSV, listos para tu hoja de cálculo.");
+      });
       function parseExportFile(raw){
         var t = String(raw || "").trim();
         if(!t) throw new Error("vacío");
@@ -2128,6 +2471,27 @@
         if(m && m[1] && m[1].trim()) return JSON.parse(m[1].trim());
         return JSON.parse(t);
       }
+      /* Restaurar ya no pisa los datos en silencio: el archivo se lee,
+         se cuentan sus registros y los actuales, y solo se aplica si el
+         usuario confirma en la ventana de confirmación. */
+      var pendingImport = null;
+      $("confirmImport").addEventListener("click", function(){
+        if(!current || !pendingImport) return;
+        current.data = pendingImport; pendingImport = null;
+        $("importConfirmBox").hidden = true;
+        persist(); renderAll();
+        var fb = $("importFeedback");
+        fb.className = "quick-feedback ok"; fb.style.color = "";
+        fb.textContent = "Datos restaurados: ahora este perfil muestra los movimientos, documentos, recordatorios e inversiones del archivo.";
+        toast("Datos restaurados correctamente.");
+      });
+      $("cancelImport").addEventListener("click", function(){
+        pendingImport = null;
+        $("importConfirmBox").hidden = true;
+        var fb = $("importFeedback");
+        fb.className = "quick-feedback"; fb.style.color = "";
+        fb.textContent = "Restauración cancelada: tus datos actuales no han cambiado.";
+      });
       $("importBtn").addEventListener("click", function(){ $("importFile").click(); });
       $("importFile").addEventListener("change", function(){
         var file = $("importFile").files[0];
@@ -2141,11 +2505,12 @@
             var hasData = candidate && typeof candidate === "object" &&
               ["movements","documents","reminders","investments"].some(function(k){ return Array.isArray(candidate[k]); });
             if(!hasData) throw new Error("formato");
-            current.data = normalizeData(candidate);
-            persist(); renderAll();
-            fb.className = "quick-feedback ok"; fb.style.color = "";
-            fb.textContent = "Datos restaurados: ahora este perfil muestra los movimientos, documentos, recordatorios e inversiones del archivo.";
-            toast("Datos restaurados correctamente.");
+            pendingImport = normalizeData(candidate);
+            var countTxt = function(dd){ return dd.movements.length + " movimientos, " + dd.documents.length + " documentos, " + dd.reminders.length + " recordatorios y " + dd.investments.length + " inversiones"; };
+            $("importConfirmText").innerHTML = "<strong>Restaurar sustituirá los datos actuales de este perfil.</strong><br />El archivo trae " + esc(countTxt(pendingImport)) + ".<br />Ahora tienes " + esc(countTxt(normalizeData(current.data))) + ". Lo actual se perderá si no lo has descargado antes.";
+            fb.className = "quick-feedback"; fb.style.color = "";
+            fb.textContent = "Confirma la restauración en la ventana que se ha abierto.";
+            $("importConfirmBox").hidden = false;
           }catch(e){
             fb.className = "quick-feedback"; fb.style.color = "var(--red)";
             fb.textContent = "Ese archivo no es válido. Usa el archivo que descarga «Descargar mis datos» o una copia antigua de ORDENIA.";
