@@ -94,6 +94,16 @@
       .seg button{ flex:1; border:none; background:transparent; color:var(--muted); border-radius:9px; font-weight:700; padding:.45rem .5rem; min-height:2.4rem; }
       .seg button.on-gasto{ background:rgba(251,113,133,.18); color:#fda4af; }
       .seg button.on-ingreso{ background:rgba(62,207,142,.16); color:#6ee7b7; }
+      .seg button.on{ background:var(--accent-soft); color:var(--text); }
+      .type-hint{ font-size:.85rem; color:var(--muted); line-height:1.5; margin:0; }
+      .type-badge{ display:inline-block; font-size:.68rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; background:var(--accent-soft); color:var(--accent-text); border-radius:6px; padding:.12rem .45rem; margin-left:.45rem; vertical-align:middle; }
+      a.btn{ text-decoration:none; }
+      .btn-wa{ color:#6ee7b7; border-color:rgba(62,207,142,.4); background:rgba(62,207,142,.08); }
+      .btn-wa:hover{ background:rgba(62,207,142,.16); }
+      .status-sel{ background:var(--bg-soft); border:1px solid var(--line); border-radius:10px; padding:.35rem .55rem; min-height:2.25rem; font-size:.85rem; font-weight:700; }
+      .order-actions{ display:flex; gap:.45rem; flex-wrap:wrap; padding:0 .2rem .7rem 3.4rem; }
+      .stock-low{ color:var(--amber); font-weight:700; }
+      .buy-tip{ font-size:.83rem; color:var(--amber); font-weight:600; }
 
       /* ---------- Auth screen ---------- */
       #authScreen{ min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:1.25rem; }
@@ -328,8 +338,11 @@
           background:rgba(13,10,24,.96); border-top:1px solid var(--line);
           padding:.35rem .25rem calc(.35rem + env(safe-area-inset-bottom));
         }
-        .nav button{ flex-direction:column; gap:.15rem; font-size:.66rem; padding:.4rem .2rem; border-radius:10px; flex:1; min-height:3.4rem; justify-content:center; }
-        .nav button svg{ width:21px; height:21px; }
+        /* min-width:0 y texto en una línea: con 8 secciones (Empresa)
+           los botones se reparten el ancho en vez de empujar los
+           últimos fuera de la pantalla, que quedaban inalcanzables. */
+        .nav button{ flex-direction:column; gap:.15rem; font-size:.6rem; padding:.4rem .05rem; border-radius:10px; flex:1 1 0; min-width:0; min-height:3.4rem; justify-content:center; white-space:nowrap; overflow:hidden; }
+        .nav button svg{ width:20px; height:20px; }
         .nav .count{ display:none; }
         .side-spacer, .delete-profile-link{ display:none; }
         .side-actions{ border-top:none; padding-top:0; flex-direction:row; }
@@ -371,7 +384,7 @@
         <!-- Lista de perfiles / crear -->
         <div id="authHome">
           <h1>Tu dinero, tus papeles y tus recordatorios, en orden.</h1>
-          <p class="sub">Crea tu perfil con un nombre y una clave (PIN). Al entrar verás solo lo tuyo: tu dinero, tus documentos, tus recordatorios y tus inversiones.</p>
+          <p class="sub">Crea tu perfil con un nombre y una clave (PIN), eligiendo si es <strong>Personal</strong> o de <strong>Empresa</strong>. La elección se hace solo al crear el perfil y queda fija: un perfil Personal ve únicamente lo personal y uno de Empresa únicamente lo del negocio, sin mezclarlos, para que cada cosa quede privada y separada.</p>
 
           <div id="existingWrap" hidden>
             <p class="auth-section-title">Perfiles en este dispositivo</p>
@@ -383,7 +396,15 @@
           <p class="auth-section-title" id="createTitle">Crear mi perfil</p>
           <form id="createForm" class="pin-wrap" autocomplete="off">
             <div class="field">
-              <label for="newName">Tu nombre</label>
+              <label>Tipo de perfil</label>
+              <div class="seg" id="profileTypeSeg" role="group" aria-label="Tipo de perfil">
+                <button type="button" data-ptype="personal" class="on">Personal</button>
+                <button type="button" data-ptype="empresa">Empresa</button>
+              </div>
+              <p class="type-hint" id="profileTypeHint">Para tu vida personal: tu dinero, tus documentos, tus recordatorios y tus inversiones. Nada de empresa se mezcla aquí.</p>
+            </div>
+            <div class="field">
+              <label for="newName" id="newNameLabel">Tu nombre</label>
               <input id="newName" type="text" name="name" autocomplete="name" placeholder="Ej.: Alex" maxlength="40" required />
             </div>
             <div class="field">
@@ -410,7 +431,7 @@
             <span class="avatar" id="pinAvatar">?</span>
             <span>
               <span class="pname" id="pinName">Perfil</span><br />
-              <span class="pmeta">Escribe tu clave para entrar</span>
+              <span class="pmeta" id="pinMeta">Escribe tu clave para entrar</span>
             </span>
           </div>
           <form id="pinForm" class="pin-wrap" style="margin-top:1.1rem" autocomplete="on">
@@ -448,7 +469,7 @@
             </div>
           </div>
           <div class="confirm-box" id="deleteConfirm" hidden>
-            <p><strong>Se borrarán todos los datos de este perfil</strong> guardados en este dispositivo (movimientos, documentos, recordatorios e inversiones). No se pueden recuperar.</p>
+            <p><strong>Se borrarán todos los datos de este perfil</strong> guardados en este dispositivo (todo lo que hayas apuntado en él). No se pueden recuperar.</p>
             <p class="form-error" id="deleteError" role="alert"></p>
             <div class="confirm-row">
               <button class="btn btn-danger btn-small" id="confirmDeleteProfile" type="button">Sí, eliminar perfil</button>
@@ -476,7 +497,7 @@
 
         <div class="local-note">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-          <span><strong>Es tu cuenta personal en este dispositivo.</strong> Tus datos se guardan solo en el navegador de este móvil u ordenador: no se suben a ningún servidor y nadie más puede verlos. La clave solo separa tu perfil de otros perfiles en este mismo aparato; si borras los datos del navegador, se pierde todo, así que descarga tus datos de vez en cuando desde «Exportar mis datos», dentro.</span>
+          <span><strong>Tu cuenta vive solo en este dispositivo.</strong> Tus datos se guardan solo en el navegador de este móvil u ordenador: no se suben a ningún servidor y nadie más puede verlos. Cada perfil es Personal o de Empresa desde que se crea, y un tipo nunca ve los datos del otro. La clave solo separa tu perfil de otros perfiles en este mismo aparato; si borras los datos del navegador, se pierde todo, así que descarga tus datos de vez en cuando desde «Exportar mis datos», dentro.</span>
         </div>
       </div>
     </div>
@@ -489,7 +510,7 @@
             <span class="avatar" id="sideAvatar">?</span>
             <span style="min-width:0">
               <span class="pname" id="sideName">Perfil</span><br />
-              <span class="pmeta">Cuenta local · este dispositivo</span>
+              <span class="pmeta" id="sideMeta">Cuenta local · este dispositivo</span>
             </span>
           </div>
           <nav class="nav" id="mainNav" aria-label="Secciones">
@@ -512,10 +533,34 @@
               Recordatorios
               <span class="count" id="countRecordatorios" hidden>0</span>
             </button>
-            <button type="button" data-view="inversiones">
+            <button type="button" data-view="inversiones" id="navBtnInversiones">
               <svg class="ic" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/><path d="M14 5l4-2 2.5 2"/></svg>
               Inversiones
               <span class="count" id="countInversiones" hidden>0</span>
+            </button>
+            <button type="button" data-view="clientes" id="navBtnClientes" hidden>
+              <svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M16 5.5a3.5 3.5 0 0 1 0 6.5M17.5 15.3c1.7.7 2.7 2.3 3 4.7"/></svg>
+              Clientes
+              <span class="count" id="countClientes" hidden>0</span>
+            </button>
+            <button type="button" data-view="pedidos" id="navBtnPedidos" hidden>
+              <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16l-1.5 9.5a2 2 0 0 1-2 1.5h-7a2 2 0 0 1-2-1.6L5 4H2.5"/><circle cx="10" cy="21" r="1.4"/><circle cx="17" cy="21" r="1.4"/></svg>
+              Pedidos
+              <span class="count" id="countPedidos" hidden>0</span>
+            </button>
+            <button type="button" data-view="metas" id="navBtnMetas">
+              <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>
+              Metas de ahorro
+              <span class="count" id="countMetas" hidden>0</span>
+            </button>
+            <button type="button" data-view="inventario" id="navBtnInventario" hidden>
+              <svg class="ic" viewBox="0 0 24 24"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>
+              Inventario
+              <span class="count" id="countInventario" hidden>0</span>
+            </button>
+            <button type="button" data-view="reportes" id="navBtnReportes" hidden>
+              <svg class="ic" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>
+              Reportes
             </button>
           </nav>
           <div class="side-spacer"></div>
@@ -562,7 +607,7 @@
                 <p class="ssub" id="statGastosSub">Sin gastos este mes</p>
               </div>
               <div class="stat">
-                <p class="slabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg>Inversiones</p>
+                <p class="slabel" id="stat4Label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M21 20H3"/></svg><span id="stat4LabelText">Inversiones</span></p>
                 <p class="svalue num" id="statInversiones">0,00 €</p>
                 <p class="ssub" id="statInversionesSub">Sin posiciones todavía</p>
               </div>
@@ -610,7 +655,7 @@
 
             <div class="card">
               <h3>Exportar mis datos</h3>
-              <p class="csub">Descarga un informe claro y legible, en tablas, con <strong>todos tus movimientos</strong> (fecha, tipo, concepto, categoría, método e importe, con totales), tus documentos, tus recordatorios y tus inversiones. No es una copia de la web: son tus datos. Ese mismo archivo sirve para restaurar todo aquí o en otro aparato, y también puedes restaurar una copia antigua.</p>
+              <p class="csub" id="exportDesc">Descarga un informe claro y legible, en tablas, con <strong>todos tus movimientos</strong> (fecha, tipo, concepto, categoría, método e importe, con totales), tus documentos, tus recordatorios y tus inversiones. No es una copia de la web: son tus datos. Ese mismo archivo sirve para restaurar todo aquí o en otro aparato, y también puedes restaurar una copia antigua.</p>
               <div class="backup-row">
                 <button class="btn btn-primary" id="exportBtn" type="button">
                   <svg class="ic" viewBox="0 0 24 24"><path d="M12 4v11M7 11l5 5 5-5M4 20h16"/></svg>
@@ -691,6 +736,88 @@
               <h3>Gastos por categoría · este mes</h3>
               <p class="csub">En qué se va el dinero este mes, de mayor a menor.</p>
               <div id="catBreakdown"></div>
+            </div>
+
+            <div class="card" id="cajaCard" hidden>
+              <h3>Cierre de caja · hoy</h3>
+              <p class="csub">Lo que debería haber hoy según tus movimientos, separado por método de pago. Cuenta el efectivo y escribe cuánto hay de verdad: te digo la diferencia al momento.</p>
+              <div id="cajaArea"></div>
+              <div class="quick-row" style="margin-top:.8rem">
+                <div class="field">
+                  <label for="cajaContado" style="font-size:.82rem; font-weight:700; color:var(--muted)">Efectivo contado en caja (€)</label>
+                  <input id="cajaContado" type="number" step="0.01" min="0" placeholder="Ej.: 320,50" />
+                </div>
+                <button class="btn" type="button" id="cajaCheckBtn" style="align-self:flex-end">Comprobar diferencia</button>
+              </div>
+              <p class="quick-feedback" id="cajaFeedback" role="status"></p>
+            </div>
+
+            <div class="card" id="presupCard" hidden>
+              <h3>Presupuestos del negocio · este mes</h3>
+              <p class="csub">Pon un límite mensual por categoría de gasto. La barra se avisa al llegar al 80 % y se pasa a rojo si lo superas.</p>
+              <form id="budgetForm">
+                <div class="quick-row">
+                  <div class="field">
+                    <label for="budCategory" style="font-size:.82rem; font-weight:700; color:var(--muted)">Categoría</label>
+                    <select id="budCategory">
+                      <option>Comida</option><option>Vivienda</option><option>Transporte</option>
+                      <option>Suscripciones</option><option>Ocio</option><option>Salud</option>
+                      <option>Compras</option><option>Trabajo / Nómina</option><option>Transferencias</option>
+                      <option>Otros</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="budAmount" style="font-size:.82rem; font-weight:700; color:var(--muted)">Límite al mes (€)</label>
+                    <input id="budAmount" type="number" step="0.01" min="0.01" placeholder="Ej.: 300" required />
+                  </div>
+                  <button class="btn btn-primary" type="submit" style="align-self:flex-end">Guardar presupuesto</button>
+                </div>
+                <p class="form-error" id="budError" role="alert"></p>
+              </form>
+              <div id="budgetList" style="margin-top:.6rem"></div>
+            </div>
+
+            <div class="card" id="fixedCard" hidden>
+              <h3>Gastos fijos automáticos</h3>
+              <p class="csub">Alquiler, suscripciones, recibos…: se registran solos en Dinero el día que elijas de cada mes, sin que tengas que acordarte. Puedes editarlos o cancelarlos cuando quieras; al cancelarlos dejan de registrarse.</p>
+              <form id="fixedForm">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="fixedConcept">Concepto</label>
+                    <input id="fixedConcept" type="text" placeholder="Ej.: Alquiler" maxlength="80" required />
+                  </div>
+                  <div class="field">
+                    <label for="fixedAmount">Importe (€)</label>
+                    <input id="fixedAmount" type="number" step="0.01" min="0.01" placeholder="0,00" required />
+                  </div>
+                  <div class="field">
+                    <label for="fixedCategory">Categoría</label>
+                    <select id="fixedCategory">
+                      <option>Comida</option><option>Vivienda</option><option>Transporte</option>
+                      <option>Suscripciones</option><option>Ocio</option><option>Salud</option>
+                      <option>Compras</option><option>Trabajo / Nómina</option><option>Transferencias</option>
+                      <option>Otros</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="fixedMethod">Método</label>
+                    <select id="fixedMethod">
+                      <option>Tarjeta</option><option>Efectivo</option><option>Bizum</option>
+                      <option>Transferencia</option><option>Cuenta bancaria</option><option>Otro</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="fixedDay">Día del mes (1–28)</label>
+                    <input id="fixedDay" type="number" step="1" min="1" max="28" placeholder="Ej.: 5" required />
+                  </div>
+                  <div class="field" style="justify-content:flex-end">
+                    <button class="btn btn-primary btn-block" type="submit" id="fixedSubmitBtn">Guardar gasto fijo</button>
+                    <button class="btn btn-block" type="button" id="fixedCancelEdit" hidden>Cancelar edición</button>
+                  </div>
+                </div>
+                <p class="form-error" id="fixedError" role="alert"></p>
+              </form>
+              <div id="fixedList" style="margin-top:.6rem"></div>
             </div>
 
             <div class="card">
@@ -889,6 +1016,205 @@
             </div>
           </section>
 
+          <!-- ===== CLIENTES (solo Empresa) ===== -->
+          <section class="view" id="view-clientes">
+            <div class="card">
+              <h3>Añadir cliente</h3>
+              <p class="csub">Los clientes de tu negocio, solo dentro de este perfil de Empresa.</p>
+              <form id="clientForm">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="cliName">Nombre del cliente</label>
+                    <input id="cliName" type="text" placeholder="Ej.: María García" maxlength="80" required />
+                  </div>
+                  <div class="field">
+                    <label for="cliPhone">Teléfono / WhatsApp</label>
+                    <input id="cliPhone" type="tel" placeholder="Ej.: 612 345 678" maxlength="24" />
+                  </div>
+                  <div class="field">
+                    <label for="cliEmail">Correo (opcional)</label>
+                    <input id="cliEmail" type="email" placeholder="Ej.: cliente@correo.com" maxlength="90" />
+                  </div>
+                  <div class="field">
+                    <label for="cliNotes">Notas</label>
+                    <input id="cliNotes" type="text" placeholder="Ej.: Paga a fin de mes" maxlength="200" />
+                  </div>
+                  <div class="field wide" style="justify-content:flex-end">
+                    <button class="btn btn-primary" type="submit" style="align-self:flex-start">Guardar cliente</button>
+                  </div>
+                </div>
+                <p class="form-error" id="cliError" role="alert"></p>
+              </form>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Mis clientes</h3></div>
+              <div id="clientList"></div>
+            </div>
+            <div class="card">
+              <h3>Deudas de clientes</h3>
+              <p class="csub">Quién te debe qué y desde cuándo. Con un toque le mandas el recordatorio por WhatsApp, ya redactado.</p>
+              <form id="debtForm">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="debtClient">Cliente que debe</label>
+                    <input id="debtClient" type="text" placeholder="Nombre del cliente" maxlength="80" list="clientNames" required />
+                  </div>
+                  <div class="field">
+                    <label for="debtAmount">Cuánto debe (€)</label>
+                    <input id="debtAmount" type="number" step="0.01" min="0.01" placeholder="0,00" required />
+                  </div>
+                  <div class="field">
+                    <label for="debtDate">Desde cuándo (fecha)</label>
+                    <input id="debtDate" type="date" required />
+                  </div>
+                  <div class="field">
+                    <label for="debtNotes">Por qué (opcional)</label>
+                    <input id="debtNotes" type="text" placeholder="Ej.: Pedido del escaparate" maxlength="160" />
+                  </div>
+                  <div class="field wide" style="justify-content:flex-end">
+                    <button class="btn btn-primary" type="submit" style="align-self:flex-start">Apuntar deuda</button>
+                  </div>
+                </div>
+                <p class="form-error" id="debtError" role="alert"></p>
+              </form>
+              <p class="csub" id="debtSummary" style="margin:.4rem 0"></p>
+              <div id="debtList"></div>
+            </div>
+          </section>
+
+          <!-- ===== PEDIDOS (solo Empresa) ===== -->
+          <section class="view" id="view-pedidos">
+            <div class="card">
+              <h3>Nuevo pedido</h3>
+              <p class="csub">Los pedidos de tu negocio: qué te encargan, para cuándo y en qué estado están.</p>
+              <form id="orderForm">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="ordClient">Cliente</label>
+                    <input id="ordClient" type="text" placeholder="Nombre del cliente" maxlength="80" list="clientNames" required />
+                    <datalist id="clientNames"></datalist>
+                  </div>
+                  <div class="field">
+                    <label for="ordDesc">Qué te ha pedido</label>
+                    <input id="ordDesc" type="text" placeholder="Ej.: 20 cajas de producto" maxlength="120" required />
+                  </div>
+                  <div class="field">
+                    <label for="ordAmount">Importe (€)</label>
+                    <input id="ordAmount" type="number" step="0.01" min="0" placeholder="0,00" />
+                  </div>
+                  <div class="field">
+                    <label for="ordDate">Fecha de entrega</label>
+                    <input id="ordDate" type="date" />
+                  </div>
+                  <div class="field">
+                    <label for="ordStatus">Estado</label>
+                    <select id="ordStatus">
+                      <option value="pendiente">Pendiente</option>
+                      <option value="en curso">En curso</option>
+                      <option value="entregado">Entregado</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                  </div>
+                  <div class="field" style="justify-content:flex-end">
+                    <button class="btn btn-primary btn-block" type="submit">Guardar pedido</button>
+                  </div>
+                </div>
+                <p class="form-error" id="ordError" role="alert"></p>
+              </form>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Pedidos</h3></div>
+              <p class="csub" id="ordSummary" style="margin-bottom:.4rem"></p>
+              <div id="orderList"></div>
+            </div>
+          </section>
+
+          <!-- ===== INVENTARIO (solo Empresa) ===== -->
+          <section class="view" id="view-inventario">
+            <div class="card">
+              <h3>Añadir producto</h3>
+              <p class="csub">Tu stock del negocio. Cuando un producto baja del mínimo que marques, ORDENIA te avisa en el Resumen y te sugiere cuánto comprar.</p>
+              <form id="prodForm">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="prodName">Producto</label>
+                    <input id="prodName" type="text" placeholder="Ej.: Camiseta básica" maxlength="80" required />
+                  </div>
+                  <div class="field">
+                    <label for="prodPrice">Precio de venta (€)</label>
+                    <input id="prodPrice" type="number" step="0.01" min="0" placeholder="0,00" />
+                  </div>
+                  <div class="field">
+                    <label for="prodStock">Unidades en stock</label>
+                    <input id="prodStock" type="number" step="1" min="0" placeholder="0" required />
+                  </div>
+                  <div class="field">
+                    <label for="prodMin">Avisar si baja de (mínimo)</label>
+                    <input id="prodMin" type="number" step="1" min="0" placeholder="Ej.: 5" required />
+                  </div>
+                  <div class="field wide" style="justify-content:flex-end">
+                    <button class="btn btn-primary" type="submit" style="align-self:flex-start">Guardar producto</button>
+                  </div>
+                </div>
+                <p class="form-error" id="prodError" role="alert"></p>
+              </form>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Stock</h3></div>
+              <div id="productList"></div>
+            </div>
+          </section>
+
+          <!-- ===== METAS DE AHORRO (solo Personal) ===== -->
+          <section class="view" id="view-metas">
+            <div class="card">
+              <h3>Nueva meta de ahorro</h3>
+              <p class="csub">Ponle nombre y objetivo a lo que quieres ahorrar: verás tu progreso y cuánto apartar cada mes para llegar a tiempo.</p>
+              <form id="goalForm">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="goalName">¿Para qué ahorras?</label>
+                    <input id="goalName" type="text" placeholder="Ej.: Viaje a Japón" maxlength="80" required />
+                  </div>
+                  <div class="field">
+                    <label for="goalTarget">Objetivo (€)</label>
+                    <input id="goalTarget" type="number" step="0.01" min="0.01" placeholder="Ej.: 1.500" required />
+                  </div>
+                  <div class="field">
+                    <label for="goalSaved">Ya tengo ahorrado (€)</label>
+                    <input id="goalSaved" type="number" step="0.01" min="0" placeholder="0,00" />
+                  </div>
+                  <div class="field">
+                    <label for="goalDeadline">Quiero tenerlo para (opcional)</label>
+                    <input id="goalDeadline" type="date" />
+                  </div>
+                  <div class="field wide" style="justify-content:flex-end">
+                    <button class="btn btn-primary" type="submit" style="align-self:flex-start">Crear meta</button>
+                  </div>
+                </div>
+                <p class="form-error" id="goalError" role="alert"></p>
+              </form>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Mis metas</h3></div>
+              <div id="goalsList"></div>
+            </div>
+          </section>
+
+          <!-- ===== REPORTES (solo Empresa) ===== -->
+          <section class="view" id="view-reportes">
+            <div class="card">
+              <h3>Ventas del negocio</h3>
+              <p class="csub">Calculado con tus pedidos entregados: cuánto has vendido, qué producto se vende más y qué cliente compra más.</p>
+              <div class="seg" id="repPeriodSeg" role="group" aria-label="Periodo del reporte" style="max-width:420px; margin-bottom:1rem">
+                <button type="button" data-period="dia">Hoy</button>
+                <button type="button" data-period="semana" class="on">Esta semana</button>
+                <button type="button" data-period="mes">Este mes</button>
+              </div>
+              <div id="reportArea"></div>
+            </div>
+          </section>
+
         </main>
       </div>
     </div>
@@ -919,7 +1245,7 @@
     </div>
 
     <div class="confirm-box" id="deleteFromAppBox" hidden style="position:fixed; inset:auto 1rem 5.5rem auto; z-index:90; max-width:360px; box-shadow:var(--shadow); background:var(--surface-2)">
-      <p><strong>Se borrarán todos tus datos de este dispositivo</strong> (movimientos, documentos, recordatorios e inversiones) y el perfil dejará de existir aquí. No se puede deshacer.</p>
+      <p><strong>Se borrarán todos tus datos de este dispositivo</strong> (todo lo que hayas apuntado en este perfil) y el perfil dejará de existir aquí. No se puede deshacer.</p>
       <div class="confirm-row">
         <button class="btn btn-danger btn-small" id="confirmDeleteFromApp" type="button">Sí, eliminar mi perfil</button>
         <button class="btn btn-small" id="cancelDeleteFromApp" type="button">Cancelar</button>
@@ -1067,7 +1393,15 @@
       var STORAGE_KEY = "ordenia-publica-v1";
       var storageOK = true;
       var store = { profiles: [] };
-      function emptyData(){ return { movements: [], documents: [], reminders: [], investments: [] }; }
+      function emptyData(){ return { movements: [], documents: [], reminders: [], investments: [], clients: [], orders: [], products: [], budgets: {}, goals: [], fixed: [], debts: [] }; }
+      /* El tipo de un perfil se elige SOLO al crearlo y queda fijo:
+         "personal" ve únicamente lo personal y "empresa" únicamente lo
+         del negocio. No hay ningún interruptor dentro de la app para
+         cambiarlo: mezclar ambos en un mismo perfil quitaría privacidad
+         y seriedad. Los perfiles creados antes de existir esta opción
+         no traen tipo: son Personal, que es lo que siempre tuvieron. */
+      function profileType(p){ return p && p.type === "empresa" ? "empresa" : "personal"; }
+      function isEmpresa(){ return !!current && profileType(current) === "empresa"; }
       function loadStore(){
         try{
           var raw = localStorage.getItem(STORAGE_KEY);
@@ -1133,6 +1467,59 @@
             buyPrice: Number(i.buyPrice) || 0,
             currentPrice: Number(i.currentPrice) || 0 };
         });
+        if(Array.isArray(d.clients)) base.clients = d.clients.filter(isRecord).map(function(c){
+          return { id: c.id ? String(c.id) : uid(),
+            name: String(c.name || "Cliente"),
+            phone: String(c.phone || ""),
+            email: String(c.email || ""),
+            notes: String(c.notes || "") };
+        });
+        if(Array.isArray(d.orders)) base.orders = d.orders.filter(isRecord).map(function(o){
+          return { id: o.id ? String(o.id) : uid(),
+            client: String(o.client || "Cliente"),
+            desc: String(o.desc || "Pedido"),
+            amount: Number(o.amount) || 0,
+            date: validDateStr(o.date),
+            status: ["pendiente","en curso","entregado","cancelado"].indexOf(o.status) !== -1 ? o.status : "pendiente" };
+        });
+        if(Array.isArray(d.products)) base.products = d.products.filter(isRecord).map(function(pr){
+          return { id: pr.id ? String(pr.id) : uid(),
+            name: String(pr.name || "Producto"),
+            stock: Math.max(0, Math.floor(Number(pr.stock) || 0)),
+            minStock: Math.max(0, Math.floor(Number(pr.minStock) || 0)),
+            price: Number(pr.price) || 0 };
+        });
+        if(d.budgets && typeof d.budgets === "object" && !Array.isArray(d.budgets)){
+          Object.keys(d.budgets).forEach(function(k){
+            var v = Number(d.budgets[k]);
+            if(v > 0) base.budgets[String(k)] = v;
+          });
+        }
+        if(Array.isArray(d.goals)) base.goals = d.goals.filter(isRecord).map(function(g){
+          return { id: g.id ? String(g.id) : uid(),
+            name: String(g.name || "Meta"),
+            target: Number(g.target) || 0,
+            saved: Math.max(0, Number(g.saved) || 0),
+            deadline: validDateStr(g.deadline) };
+        });
+        if(Array.isArray(d.fixed)) base.fixed = d.fixed.filter(isRecord).map(function(f){
+          return { id: f.id ? String(f.id) : uid(),
+            concept: String(f.concept || "Gasto fijo"),
+            amount: Number(f.amount) || 0,
+            category: String(f.category || "Otros"),
+            method: String(f.method || "Tarjeta"),
+            day: Math.min(28, Math.max(1, Math.floor(Number(f.day) || 1))),
+            active: f.active !== false,
+            lastMonth: typeof f.lastMonth === "string" ? f.lastMonth : "" };
+        });
+        if(Array.isArray(d.debts)) base.debts = d.debts.filter(isRecord).map(function(db){
+          return { id: db.id ? String(db.id) : uid(),
+            client: String(db.client || "Cliente"),
+            amount: Number(db.amount) || 0,
+            date: validDateStr(db.date) || todayStr(),
+            notes: String(db.notes || ""),
+            paid: !!db.paid };
+        });
         return base;
       }
       function findProfile(id){ return store.profiles.find(function(p){ return p.id === id; }) || null; }
@@ -1141,6 +1528,7 @@
       var current = null;          // perfil activo (objeto dentro de store.profiles)
       var pinTargetId = null;      // perfil seleccionado en la pantalla de PIN
       var createOpen = false;      // formulario de registro desplegado (con perfiles, va plegado: quien vuelve entra por su perfil)
+      var createType = "personal"; // tipo elegido en el registro: se fija al crear el perfil y no se puede cambiar después
       var stopDictation = null;    // lo asigna el dictado por voz para cortarlo al bloquear o cambiar de perfil
 
       function renderAuthHome(){
@@ -1165,7 +1553,7 @@
           list.innerHTML = store.profiles.map(function(p){
             return '<button type="button" class="profile-pick" data-profile="' + p.id + '">' +
               '<span class="avatar">' + esc((p.name || "?").trim().charAt(0).toUpperCase() || "?") + '</span>' +
-              '<span><span class="pname">' + esc(p.name) + (p.savedPin ? '<span class="direct-badge">Entrada directa</span>' : "") + '</span><br /><span class="pmeta">' +
+              '<span><span class="pname">' + esc(p.name) + '<span class="type-badge">' + (profileType(p) === "empresa" ? "Empresa" : "Personal") + '</span>' + (p.savedPin ? '<span class="direct-badge">Entrada directa</span>' : "") + '</span><br /><span class="pmeta">' +
               (p.savedPin ? "Clave guardada en este dispositivo · toca para entrar" : "Toca para escribir tu clave") +
               '</span></span>' +
               '<svg class="ic chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></button>';
@@ -1193,6 +1581,7 @@
         $("changePinError").textContent = "";
         $("pinAvatar").textContent = (p.name || "?").trim().charAt(0).toUpperCase() || "?";
         $("pinName").textContent = p.name;
+        $("pinMeta").textContent = (profileType(p) === "empresa" ? "Perfil de Empresa" : "Perfil Personal") + " · Escribe tu clave para entrar";
         $("pinInput").value = "";
         $("pinError").textContent = "";
         setTimeout(function(){ $("pinInput").focus(); }, 30);
@@ -1204,9 +1593,30 @@
         $("appScreen").style.display = "block";
         $("sideAvatar").textContent = (profile.name || "?").trim().charAt(0).toUpperCase() || "?";
         $("sideName").textContent = profile.name;
+        var emp = profileType(profile) === "empresa";
+        /* El menú enseña solo las secciones del tipo de este perfil:
+           Personal no ve Clientes ni Pedidos; Empresa no ve
+           Inversiones. No hay ningún botón para pasar de un tipo a
+           otro dentro del perfil. */
+        $("sideMeta").textContent = emp ? "Cuenta de empresa · este dispositivo" : "Cuenta personal · este dispositivo";
+        $("navBtnInversiones").hidden = emp;
+        $("navBtnClientes").hidden = !emp;
+        $("navBtnPedidos").hidden = !emp;
+        $("navBtnInventario").hidden = !emp;
+        $("navBtnReportes").hidden = !emp;
+        $("cajaCard").hidden = !emp;
+        $("presupCard").hidden = !emp;
+        $("navBtnMetas").hidden = emp;
+        $("fixedCard").hidden = emp;
+        $("stat4LabelText").textContent = emp ? "Pedidos pendientes" : "Inversiones";
+        $("exportDesc").innerHTML = emp
+          ? "Descarga un informe claro y legible, en tablas, con <strong>todos los movimientos del negocio</strong> (fecha, tipo, concepto, categoría, método e importe, con totales), sus documentos, sus recordatorios, sus clientes y sus pedidos. No es una copia de la web: son los datos de tu empresa. Ese mismo archivo sirve para restaurar todo aquí o en otro aparato, y también puedes restaurar una copia antigua."
+          : "Descarga un informe claro y legible, en tablas, con <strong>todos tus movimientos</strong> (fecha, tipo, concepto, categoría, método e importe, con totales), tus documentos, tus recordatorios y tus inversiones. No es una copia de la web: son tus datos. Ese mismo archivo sirve para restaurar todo aquí o en otro aparato, y también puedes restaurar una copia antigua.";
         $("removeSavedPin").hidden = !profile.savedPin;
         $("movDate").value = todayStr();
         $("remDate").value = todayStr();
+        var od = $("ordDate"); if(od) od.value = todayStr();
+        var dd = $("debtDate"); if(dd) dd.value = todayStr();
         switchView("resumen");
         renderAll();
         if(!storageOK) toast("Este navegador no permite guardar datos: lo que apuntes se perderá al cerrar la página.");
@@ -1216,7 +1626,7 @@
          compartido, el siguiente perfil no puede ver ni restos del
          anterior, y cada perfil solo dibuja sus propios datos. */
       function clearRenderedData(){
-        ["resumenMovimientos","resumenRecordatorios","movementList","docList","remList","invList","chartArea","searchResults","catBreakdown","avisosList"].forEach(function(id){
+        ["resumenMovimientos","resumenRecordatorios","movementList","docList","remList","invList","clientList","orderList","productList","reportArea","cajaArea","budgetList","goalsList","fixedList","debtList","chartArea","searchResults","catBreakdown","avisosList"].forEach(function(id){
           var el = $(id); if(el) el.innerHTML = "";
         });
         $("avisosCard").hidden = true;
@@ -1272,6 +1682,27 @@
         showPinFor(p.id);
       });
       $("backToList").addEventListener("click", function(){ renderAuthHome(); });
+      /* Selector de tipo en el registro: Personal o Empresa. Es la
+         única vez que se elige: queda guardado en el perfil al crearlo
+         y dentro de la app no existe forma de cambiarlo ni de ver el
+         otro tipo. */
+      var TYPE_HINTS = {
+        personal: "Para tu vida personal: tu dinero, tus documentos, tus recordatorios y tus inversiones. Nada de empresa se mezcla aquí.",
+        empresa: "Para tu negocio: el dinero de la empresa, sus documentos, sus recordatorios, sus clientes y sus pedidos. Nada personal se mezcla aquí."
+      };
+      function setCreateType(t){
+        createType = t === "empresa" ? "empresa" : "personal";
+        document.querySelectorAll("#profileTypeSeg button").forEach(function(b){
+          b.classList.toggle("on", b.getAttribute("data-ptype") === createType);
+        });
+        $("profileTypeHint").textContent = TYPE_HINTS[createType];
+        $("newNameLabel").textContent = createType === "empresa" ? "Nombre de la empresa o negocio" : "Tu nombre";
+        $("newName").placeholder = createType === "empresa" ? "Ej.: Taller López" : "Ej.: Alex";
+      }
+      $("profileTypeSeg").addEventListener("click", function(e){
+        var b = e.target.closest("[data-ptype]"); if(!b) return;
+        setCreateType(b.getAttribute("data-ptype"));
+      });
       $("createForm").addEventListener("submit", function(e){
         e.preventDefault();
         var name = $("newName").value.trim();
@@ -1285,7 +1716,7 @@
           return;
         }
         var remember = $("rememberPinCreate").checked;
-        var profile = { id: uid(), name: name,
+        var profile = { id: uid(), name: name, type: createType,
           pinHash: sha256Hex(new TextEncoder().encode("ordenia-publica::" + pin)),
           pinHashAlt: fallbackHash(pin),
           savedPin: remember ? pin : null,
@@ -1293,8 +1724,9 @@
         store.profiles.push(profile);
         saveStore();
         $("createForm").reset();
+        setCreateType("personal");
         createOpen = false;
-        toast("Perfil creado. Todo lo que apuntes se guarda solo en este dispositivo.");
+        toast("Perfil " + (profile.type === "empresa" ? "de Empresa" : "Personal") + " creado. Todo lo que apuntes se guarda solo en este dispositivo.");
         enterApp(profile);
       });
       $("pinForm").addEventListener("submit", function(e){
@@ -1420,9 +1852,18 @@
       });
 
       /* ============ Navegación ============ */
-      var VIEW_TITLES = { resumen:"Resumen", dinero:"Dinero", documentos:"Documentos", recordatorios:"Recordatorios", inversiones:"Inversiones" };
+      var VIEW_TITLES = { resumen:"Resumen", dinero:"Dinero", documentos:"Documentos", recordatorios:"Recordatorios", inversiones:"Inversiones", metas:"Metas de ahorro", clientes:"Clientes", pedidos:"Pedidos", inventario:"Inventario", reportes:"Reportes" };
+      var EMPRESA_VIEWS = ["clientes","pedidos","inventario","reportes"];
+      var PERSONAL_VIEWS = ["inversiones","metas"];
       function switchView(name){
         if(typeof stopDictation === "function") stopDictation();
+        /* Guarda de tipo: aunque algo pidiera la vista del otro tipo,
+           un perfil Personal nunca abre las secciones de empresa y uno
+           de Empresa nunca abre las personales; cae en Resumen. */
+        if(current){
+          if(isEmpresa() && PERSONAL_VIEWS.indexOf(name) !== -1) name = "resumen";
+          if(!isEmpresa() && EMPRESA_VIEWS.indexOf(name) !== -1) name = "resumen";
+        }
         document.querySelectorAll("#mainNav button").forEach(function(b){
           b.classList.toggle("active", b.getAttribute("data-view") === name);
         });
@@ -1447,12 +1888,17 @@
       /* ============ Render general ============ */
       function renderAll(){
         if(!current) return;
+        processFixedExpenses();
         renderCounts();
         renderResumen();
         renderDinero();
         renderDocumentos();
         renderRecordatorios();
-        renderInversiones();
+        /* Cada tipo dibuja solo sus secciones propias: el perfil
+           Personal no genera nada de empresa y el de Empresa nada
+           personal, ni siquiera oculto en la página. */
+        if(isEmpresa()){ renderClientes(); renderPedidos(); renderInventario(); renderReportes(); renderDebts(); }
+        else { renderInversiones(); renderMetas(); }
       }
       function renderCounts(){
         var d = D();
@@ -1467,7 +1913,20 @@
         var rc = $("countRecordatorios");
         rc.style.background = hasOverdue ? "rgba(251,113,133,.28)" : "";
         rc.style.color = hasOverdue ? "#fda4af" : "";
-        setCount("countInversiones", d.investments.length);
+        if(isEmpresa()){
+          setCount("countClientes", d.clients.length);
+          setCount("countPedidos", d.orders.filter(function(o){ return o.status === "pendiente" || o.status === "en curso"; }).length);
+          /* El contador de Inventario no cuenta productos: cuenta los
+             que están bajos de stock, que es lo que pide atención. */
+          var lowN = d.products.filter(function(pr){ return pr.stock <= pr.minStock; }).length;
+          setCount("countInventario", lowN);
+          var ic = $("countInventario");
+          ic.style.background = lowN ? "rgba(251,191,36,.25)" : "";
+          ic.style.color = lowN ? "#fcd34d" : "";
+        } else {
+          setCount("countInversiones", d.investments.length);
+          setCount("countMetas", d.goals.length);
+        }
       }
       function setCount(id, n){ var el = $(id); el.hidden = !n; el.textContent = n; }
 
@@ -1540,9 +1999,17 @@
         var nGas = d.movements.filter(function(m){ return m.type === "gasto" && m.date.slice(0,7) === mk; }).length;
         $("statIngresosSub").textContent = nIng ? nIng + (nIng === 1 ? " ingreso este mes" : " ingresos este mes") : "Sin ingresos este mes";
         $("statGastosSub").textContent = nGas ? nGas + (nGas === 1 ? " gasto este mes" : " gastos este mes") : "Sin gastos este mes";
-        var invVal = d.investments.reduce(function(s,i){ return s + (Number(i.qty)||0) * (Number(i.currentPrice)||0); }, 0);
-        $("statInversiones").textContent = fmtEUR(invVal);
-        $("statInversionesSub").textContent = d.investments.length ? d.investments.length + (d.investments.length === 1 ? " posición abierta" : " posiciones abiertas") : "Sin posiciones todavía";
+        if(isEmpresa()){
+          var pend = d.orders.filter(function(o){ return o.status === "pendiente" || o.status === "en curso"; });
+          var pendTotal = pend.reduce(function(s,o){ return s + (Number(o.amount)||0); }, 0);
+          $("statInversiones").textContent = String(pend.length);
+          $("statInversiones").className = "svalue num";
+          $("statInversionesSub").textContent = pend.length ? "Por entregar · " + fmtEUR(pendTotal) + " en pedidos" : "Sin pedidos pendientes";
+        } else {
+          var invVal = d.investments.reduce(function(s,i){ return s + (Number(i.qty)||0) * (Number(i.currentPrice)||0); }, 0);
+          $("statInversiones").textContent = fmtEUR(invVal);
+          $("statInversionesSub").textContent = d.investments.length ? d.investments.length + (d.investments.length === 1 ? " posición abierta" : " posiciones abiertas") : "Sin posiciones todavía";
+        }
 
         var last = d.movements.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0,5);
         $("resumenMovimientos").innerHTML = last.length
@@ -1575,6 +2042,17 @@
             if(doc.expiry < today) lines.push({ text: "<strong>Documento caducado:</strong> " + esc(doc.name) + " · caducó el " + fmtDate(doc.expiry), view: "documentos" });
             else if(doc.expiry <= limit) lines.push({ text: "<strong>Caduca pronto:</strong> " + esc(doc.name) + " · " + fmtDate(doc.expiry), view: "documentos" });
           });
+        if(isEmpresa()){
+          d.orders.filter(function(o){ return (o.status === "pendiente" || o.status === "en curso") && o.date && o.date <= today; })
+            .sort(function(a,b){ return a.date.localeCompare(b.date); }).forEach(function(o){
+              lines.push({ text: "<strong>" + (o.date < today ? "Pedido vencido" : "Pedido para hoy") + ":</strong> " + esc(o.desc) + " · " + esc(o.client) + " · " + fmtDate(o.date), view: "pedidos" });
+            });
+          d.products.filter(function(pr){ return pr.stock <= pr.minStock; })
+            .sort(function(a,b){ return a.stock - b.stock; }).forEach(function(pr){
+              var buy = Math.max(0, pr.minStock * 2 - pr.stock);
+              lines.push({ text: "<strong>Stock bajo:</strong> " + esc(pr.name) + " · quedan " + pr.stock + (buy ? " · sugerencia: comprar " + buy + " uds." : ""), view: "inventario" });
+            });
+        }
         var card = $("avisosCard");
         card.hidden = !lines.length;
         if(!lines.length){ $("avisosList").innerHTML = ""; return; }
@@ -1710,6 +2188,10 @@
           ? '<div class="item-list">' + list.map(function(m){ return movementRow(m, true); }).join("") + '</div>'
           : emptyBox(d.movements.length ? "Nada con esos filtros" : "Sin movimientos todavía",
                      d.movements.length ? "Prueba con otra búsqueda o quita los filtros." : "Usa el formulario de arriba para registrar tu primer ingreso o gasto.");
+        /* Tarjetas propias de cada tipo, dentro de Dinero: la de
+           Empresa no se dibuja en Personal y al revés. */
+        if(isEmpresa()){ renderCaja(d); renderPresupuestos(d); }
+        else renderFixed();
       }
       function renderChart(d){
         var area = $("chartArea");
@@ -1878,6 +2360,582 @@
           : emptyBox("Sin inversiones todavía", "Añade tu primera posición con el formulario: una acción, un ETF, cripto… con su precio de compra.");
       }
 
+      /* ============ Ayudantes de Empresa y Personal ============ */
+      function nameKey(s){ return String(s || "").trim().toLowerCase(); }
+      function clientByName(name){
+        if(!current) return null;
+        var k = nameKey(name);
+        return D().clients.find(function(c){ return nameKey(c.name) === k; }) || null;
+      }
+      /* Enlace de WhatsApp con el mensaje ya redactado: si el cliente
+         tiene teléfono se le escribe a él; si no, WhatsApp deja elegir
+         el contacto al abrirse. Los números de 9 cifras se entienden
+         de España y se les pone el 34 delante. */
+      function waHref(phone, text){
+        var num = String(phone || "").replace(/\D/g, "");
+        if(num.length === 9) num = "34" + num;
+        return (num ? "https://wa.me/" + num : "https://wa.me/") + "?text=" + encodeURIComponent(text);
+      }
+      function daysSince(dateStr){
+        if(!dateStr) return 0;
+        var p = dateStr.split("-");
+        var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+        var now = new Date(); now.setHours(0,0,0,0);
+        return Math.max(0, Math.round((now - d) / 86400000));
+      }
+
+      /* ============ Gastos fijos automáticos (solo Personal) ============
+         Al dibujar, cada gasto fijo activo cuyo día ya llegó este mes
+         y que aún no se registró este mes se apunta solo en Dinero con
+         su fecha. lastMonth guarda el último mes registrado: así no se
+         duplica aunque se entre muchas veces, y si un mes no se entra,
+         no se inventan meses pasados: se registra al volver, con la
+         fecha de este mes. */
+      function processFixedExpenses(){
+        if(!current || isEmpresa()) return;
+        var mk = todayStr().slice(0,7);
+        var dayToday = new Date().getDate();
+        var changed = false, added = 0;
+        D().fixed.forEach(function(f){
+          if(!f.active || f.lastMonth === mk || dayToday < f.day) return;
+          D().movements.push({ id: uid(), type: "gasto", concept: f.concept, amount: f.amount,
+            category: f.category, method: f.method, date: mk + "-" + String(f.day).padStart(2, "0") });
+          f.lastMonth = mk;
+          changed = true; added++;
+        });
+        if(changed){
+          persist();
+          toast(added === 1 ? "Tu gasto fijo de este mes ya se ha registrado solo en Dinero." : "Tus " + added + " gastos fijos de este mes ya se han registrado solos en Dinero.");
+        }
+      }
+      var editingFixedId = null;
+      function resetFixedEdit(){
+        editingFixedId = null;
+        $("fixedSubmitBtn").textContent = "Guardar gasto fijo";
+        $("fixedCancelEdit").hidden = true;
+      }
+      $("fixedCancelEdit").addEventListener("click", function(){
+        resetFixedEdit();
+        $("fixedForm").reset();
+        $("fixedError").textContent = "";
+      });
+      $("fixedForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || isEmpresa()) return;
+        var concept = $("fixedConcept").value.trim();
+        var amount = parseFloat($("fixedAmount").value);
+        var day = Math.floor(Number($("fixedDay").value));
+        var err = $("fixedError"); err.textContent = "";
+        if(!concept){ err.textContent = "Escribe un concepto."; return; }
+        if(!(amount > 0)){ err.textContent = "El importe tiene que ser mayor que cero."; return; }
+        if(!(day >= 1 && day <= 28)){ err.textContent = "El día tiene que estar entre 1 y 28."; return; }
+        if(editingFixedId){
+          var ef = D().fixed.find(function(x){ return x.id === editingFixedId; });
+          if(ef){
+            ef.concept = concept; ef.amount = amount; ef.day = day;
+            ef.category = $("fixedCategory").value; ef.method = $("fixedMethod").value;
+            persist(); renderAll();
+            resetFixedEdit(); $("fixedForm").reset();
+            toast("Gasto fijo actualizado.");
+            return;
+          }
+          resetFixedEdit();
+        }
+        D().fixed.push({ id: uid(), concept: concept, amount: amount, category: $("fixedCategory").value,
+          method: $("fixedMethod").value, day: day, active: true, lastMonth: "" });
+        persist(); renderAll();
+        $("fixedForm").reset();
+        toast("Gasto fijo guardado: se registrará solo cada mes el día " + day + ".");
+      });
+      function renderFixed(){
+        if(!current || isEmpresa()) return;
+        var list = D().fixed.slice().sort(function(a,b){ return a.day - b.day; });
+        $("fixedList").innerHTML = list.length
+          ? '<div class="item-list">' + list.map(function(f){
+              return '<div class="item' + (f.active ? "" : " done") + '">' +
+                '<span class="iicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg></span>' +
+                '<span class="imain"><span class="ititle">' + esc(f.concept) + '</span><br />' +
+                '<span class="imeta">Día ' + f.day + " de cada mes · " + esc(f.category) + " · " + esc(f.method) + (f.active ? "" : " · Cancelado") + '</span></span>' +
+                '<span class="iamount num neg">−' + fmtEUR(f.amount).replace("-", "") + '</span>' +
+                '<button class="btn btn-small" type="button" data-fixed-edit="' + f.id + '">Editar</button>' +
+                '<button class="btn btn-small" type="button" data-fixed-off="' + f.id + '">' + (f.active ? "Cancelar" : "Reactivar") + '</button>' +
+                '<button class="icon-btn danger" type="button" data-del="fixed" data-id="' + f.id + '" aria-label="Eliminar gasto fijo"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' +
+                '</div>';
+            }).join("") + '</div>'
+          : emptyBox("Sin gastos fijos todavía", "Apunta el alquiler o una suscripción y se registrará solo cada mes.");
+      }
+
+      /* ============ Metas de ahorro (solo Personal) ============ */
+      $("goalForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || isEmpresa()) return;
+        var name = $("goalName").value.trim();
+        var target = parseFloat($("goalTarget").value);
+        var saved = parseFloat($("goalSaved").value) || 0;
+        var err = $("goalError"); err.textContent = "";
+        if(!name){ err.textContent = "Escribe para qué ahorras."; return; }
+        if(!(target > 0)){ err.textContent = "El objetivo tiene que ser mayor que cero."; return; }
+        if(saved < 0){ err.textContent = "Lo ya ahorrado no puede ser negativo."; return; }
+        D().goals.push({ id: uid(), name: name, target: target, saved: Math.min(saved, target),
+          deadline: $("goalDeadline").value || "" });
+        persist(); renderAll();
+        $("goalForm").reset();
+        toast("Meta creada: " + name + ".");
+      });
+      function renderMetas(){
+        if(!current || isEmpresa()) return;
+        var list = D().goals;
+        $("goalsList").innerHTML = list.length
+          ? list.map(function(g){
+              var pct = g.target > 0 ? Math.min(100, Math.round(g.saved / g.target * 100)) : 0;
+              var rest = Math.max(0, g.target - g.saved);
+              var monthlyTxt = "";
+              if(rest <= 0) monthlyTxt = "¡Meta conseguida! Ya tienes el objetivo completo.";
+              else if(g.deadline){
+                var days = daysSince(g.deadline) === 0 && g.deadline >= todayStr()
+                  ? Math.ceil((new Date(g.deadline) - new Date(todayStr())) / 86400000) : -1;
+                if(g.deadline < todayStr()) monthlyTxt = "La fecha ya pasó: te faltan " + fmtEUR(rest) + ". Pon una fecha nueva o aporta lo que puedas.";
+                else {
+                  var months = Math.max(1, Math.ceil(days / 30.44));
+                  monthlyTxt = "Aparta " + fmtEUR(rest / months) + " al mes para llegar el " + fmtDate(g.deadline) + ".";
+                }
+              } else monthlyTxt = "Te faltan " + fmtEUR(rest) + ". Ponle una fecha límite y te calculo cuánto apartar cada mes.";
+              return '<div style="margin-bottom:1.1rem">' +
+                '<div class="cb-head" style="display:flex; justify-content:space-between; gap:.8rem; font-size:.92rem; font-weight:700; margin-bottom:.3rem"><span>' + esc(g.name) + '</span><span class="num" style="color:var(--muted)">' + fmtEUR(g.saved) + " de " + fmtEUR(g.target) + " · " + pct + ' %</span></div>' +
+                '<div class="cat-bar"><div style="width:' + pct + '%; background:' + (pct >= 100 ? "var(--green)" : "var(--accent)") + '"></div></div>' +
+                '<p style="font-size:.85rem; color:var(--muted); margin:.35rem 0 .5rem">' + esc(monthlyTxt) + '</p>' +
+                '<div class="quick-row"><div class="field"><input id="goalAmt-' + g.id + '" type="number" step="0.01" min="0.01" placeholder="Aportar (€)" aria-label="Cantidad a aportar a ' + esc(g.name) + '" /></div>' +
+                '<button class="btn btn-small" type="button" data-goal-add="' + g.id + '">Aportar</button>' +
+                '<button class="icon-btn danger" type="button" data-del="goal" data-id="' + g.id + '" aria-label="Eliminar meta"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button></div>' +
+                '</div>';
+            }).join("")
+          : emptyBox("Sin metas todavía", "Crea la primera arriba: un viaje, un colchón de seguridad, lo que sea.");
+      }
+
+      /* ============ Clientes (solo Empresa) ============ */
+      $("clientForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || !isEmpresa()) return;
+        var name = $("cliName").value.trim();
+        var err = $("cliError"); err.textContent = "";
+        if(!name){ err.textContent = "Escribe el nombre del cliente."; return; }
+        if(clientByName(name)){ err.textContent = "Ya tienes un cliente con ese nombre."; return; }
+        D().clients.push({ id: uid(), name: name, phone: $("cliPhone").value.trim(),
+          email: $("cliEmail").value.trim(), notes: $("cliNotes").value.trim() });
+        persist(); renderAll();
+        $("clientForm").reset();
+        toast("Cliente guardado.");
+      });
+      function clientOrders(name){
+        var k = nameKey(name);
+        return D().orders.filter(function(o){ return nameKey(o.client) === k; });
+      }
+      function renderClientes(){
+        if(!current || !isEmpresa()) return;
+        var list = D().clients;
+        /* El desplegable de clientes de Pedidos y Deudas se rellena
+           con los mismos nombres, para escribirlos siempre igual. */
+        $("clientNames").innerHTML = list.map(function(c){ return '<option value="' + esc(c.name) + '"></option>'; }).join("");
+        $("clientList").innerHTML = list.length
+          ? '<div class="item-list">' + list.map(function(c){
+              var ords = clientOrders(c.name);
+              var gastado = ords.filter(function(o){ return o.status === "entregado"; })
+                .reduce(function(s,o){ return s + (Number(o.amount)||0); }, 0);
+              var debe = D().debts.filter(function(db){ return !db.paid && nameKey(db.client) === nameKey(c.name); })
+                .reduce(function(s,db){ return s + (Number(db.amount)||0); }, 0);
+              var last = ords.slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); }).slice(0,3);
+              var hist = last.length
+                ? '<br /><span class="imeta">Últimos pedidos: ' + last.map(function(o){ return esc(o.desc) + " (" + esc(o.status) + ")"; }).join(" · ") + '</span>'
+                : "";
+              return '<div class="item">' +
+                '<span class="iicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><circle cx="10" cy="8" r="3.5"/><path d="M4.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/></svg></span>' +
+                '<span class="imain"><span class="ititle">' + esc(c.name) + '</span><br />' +
+                '<span class="imeta">' + [c.phone, c.email, c.notes].filter(Boolean).map(esc).join(" · ") + (c.phone || c.email || c.notes ? "<br />" : "") +
+                ords.length + (ords.length === 1 ? " pedido" : " pedidos") + " · Total gastado: " + fmtEUR(gastado) + (debe > 0 ? ' · <span class="stock-low">Debe ' + fmtEUR(debe) + '</span>' : "") + '</span>' + hist + '</span>' +
+                (c.phone ? '<a class="btn btn-small btn-wa" target="_blank" rel="noopener" href="' + waHref(c.phone, "Hola " + c.name + ", te escribo de " + current.name + ".") + '">WhatsApp</a>' : "") +
+                '<button class="icon-btn danger" type="button" data-del="client" data-id="' + c.id + '" aria-label="Eliminar cliente"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' +
+                '</div>';
+            }).join("") + '</div>'
+          : emptyBox("Sin clientes todavía", "Añade tu primer cliente con el formulario: aparecerá aquí con su historial de compras.");
+      }
+
+      /* ============ Pedidos, ticket y aviso al cliente (solo Empresa) ============ */
+      function orderStatusText(o){
+        return "Hola " + o.client + ", te escribo de " + current.name + ". Tu pedido «" + o.desc + "» está ahora: " + String(o.status).toUpperCase() +
+          (o.amount ? " · Importe: " + fmtEUR(o.amount) : "") + (o.date ? " · Entrega: " + fmtDate(o.date) : "") + ". ¡Gracias por tu confianza!";
+      }
+      function ticketText(o){
+        return "TICKET · " + current.name + "\nCliente: " + o.client + "\nPedido: " + o.desc +
+          "\nImporte: " + fmtEUR(o.amount) + "\nEstado: " + o.status + (o.date ? "\nEntrega: " + fmtDate(o.date) : "") +
+          "\nFecha del ticket: " + fmtDate(todayStr());
+      }
+      function downloadTicket(o){
+        var html = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\" /><title>Ticket · " + esc(current.name) + "</title>" +
+          "<style>body{font-family:system-ui,Arial,sans-serif;background:#f6f5fb;color:#17122b;margin:0}.t{max-width:420px;margin:24px auto;background:#fff;border:1px solid #e4def5;border-radius:14px;padding:22px}h1{font-size:1.05rem;letter-spacing:.1em;color:#7c3aed;margin:0 0 4px}.n{font-size:1.3rem;font-weight:800;margin:0 0 14px}table{width:100%;border-collapse:collapse;font-size:.95rem}td{padding:7px 0;border-bottom:1px solid #eeeaf9}td:first-child{color:#5b5470;width:38%}.tot{font-size:1.15rem;font-weight:800;text-align:right;padding-top:12px}</style></head><body><div class=\"t\">" +
+          "<h1>TICKET</h1><p class=\"n\">" + esc(current.name) + "</p><table>" +
+          "<tr><td>Cliente</td><td>" + esc(o.client) + "</td></tr>" +
+          "<tr><td>Pedido</td><td>" + esc(o.desc) + "</td></tr>" +
+          "<tr><td>Estado</td><td>" + esc(o.status) + "</td></tr>" +
+          (o.date ? "<tr><td>Entrega</td><td>" + esc(fmtDate(o.date)) + "</td></tr>" : "") +
+          "<tr><td>Fecha</td><td>" + esc(fmtDate(todayStr())) + "</td></tr></table>" +
+          "<p class=\"tot\">" + esc(fmtEUR(o.amount)) + "</p></div></body></html>";
+        var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "ticket-" + slugName(o.client) + ".html";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+        toast("Ticket descargado, listo para enviar.");
+      }
+      $("orderForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || !isEmpresa()) return;
+        var client = $("ordClient").value.trim();
+        var desc = $("ordDesc").value.trim();
+        var err = $("ordError"); err.textContent = "";
+        if(!client){ err.textContent = "Escribe el cliente."; return; }
+        if(!desc){ err.textContent = "Escribe qué te ha pedido."; return; }
+        D().orders.push({ id: uid(), client: client, desc: desc,
+          amount: parseFloat($("ordAmount").value) || 0,
+          date: $("ordDate").value || "", status: $("ordStatus").value });
+        /* Si el cliente es nuevo, entra también en la lista de
+           clientes: su historial empieza con este pedido. */
+        var newClient = !clientByName(client);
+        if(newClient) D().clients.push({ id: uid(), name: client, phone: "", email: "", notes: "" });
+        persist(); renderAll();
+        $("orderForm").reset(); $("ordDate").value = todayStr();
+        toast(newClient ? "Pedido guardado y cliente añadido a tu lista." : "Pedido guardado.");
+      });
+      var ORDER_STATUS = ["pendiente","en curso","entregado","cancelado"];
+      function renderPedidos(){
+        if(!current || !isEmpresa()) return;
+        var list = D().orders.slice().sort(function(a,b){
+          var rank = function(o){ return o.status === "pendiente" ? 0 : o.status === "en curso" ? 1 : o.status === "entregado" ? 2 : 3; };
+          if(rank(a) !== rank(b)) return rank(a) - rank(b);
+          return String(a.date || "9999").localeCompare(String(b.date || "9999"));
+        });
+        var pend = D().orders.filter(function(o){ return o.status === "pendiente" || o.status === "en curso"; });
+        var pendTotal = pend.reduce(function(s,o){ return s + (Number(o.amount)||0); }, 0);
+        $("ordSummary").textContent = D().orders.length
+          ? pend.length + (pend.length === 1 ? " pedido por entregar" : " pedidos por entregar") + " · " + fmtEUR(pendTotal) + " en curso"
+          : "";
+        $("orderList").innerHTML = list.length
+          ? list.map(function(o){
+              var cli = clientByName(o.client);
+              var phone = cli ? cli.phone : "";
+              return '<div class="item">' +
+                '<span class="iicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M4 7h16l-1.5 9.5a2 2 0 0 1-2 1.5h-7a2 2 0 0 1-2-1.6L5 4H2.5"/><circle cx="10" cy="21" r="1.4"/><circle cx="17" cy="21" r="1.4"/></svg></span>' +
+                '<span class="imain"><span class="ititle">' + esc(o.desc) + '</span><br />' +
+                '<span class="imeta">' + esc(o.client) + (o.date ? " · Entrega: " + fmtDate(o.date) : " · Sin fecha de entrega") + '</span></span>' +
+                '<span class="iamount num">' + fmtEUR(o.amount) + '</span>' +
+                '<select class="status-sel" data-order-status="' + o.id + '" aria-label="Estado del pedido">' +
+                  ORDER_STATUS.map(function(s){ return '<option value="' + s + '"' + (o.status === s ? " selected" : "") + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>'; }).join("") +
+                '</select>' +
+                '<button class="icon-btn danger" type="button" data-del="order" data-id="' + o.id + '" aria-label="Eliminar pedido"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' +
+                '</div>' +
+                '<div class="order-actions">' +
+                '<a class="btn btn-small btn-wa" target="_blank" rel="noopener" href="' + waHref(phone, orderStatusText(o)) + '">Avisar estado por WhatsApp</a>' +
+                '<a class="btn btn-small btn-wa" target="_blank" rel="noopener" href="' + waHref(phone, ticketText(o)) + '">Ticket por WhatsApp</a>' +
+                '<button class="btn btn-small" type="button" data-ticket="' + o.id + '">Descargar ticket</button>' +
+                '</div>';
+            }).join("")
+          : emptyBox("Sin pedidos todavía", "Apunta tu primer pedido arriba: cliente, qué te encarga, importe y fecha de entrega.");
+      }
+
+      /* ============ Inventario y stock bajo (solo Empresa) ============ */
+      $("prodForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || !isEmpresa()) return;
+        var name = $("prodName").value.trim();
+        var stock = Math.floor(Number($("prodStock").value));
+        var min = Math.floor(Number($("prodMin").value));
+        var err = $("prodError"); err.textContent = "";
+        if(!name){ err.textContent = "Escribe el producto."; return; }
+        if(!(stock >= 0) || isNaN(stock)){ err.textContent = "Escribe las unidades en stock."; return; }
+        if(!(min >= 0) || isNaN(min)){ err.textContent = "Escribe el mínimo para el aviso."; return; }
+        D().products.push({ id: uid(), name: name, stock: stock, minStock: min,
+          price: parseFloat($("prodPrice").value) || 0 });
+        persist(); renderAll();
+        $("prodForm").reset();
+        toast("Producto guardado en el inventario.");
+      });
+      function renderInventario(){
+        if(!current || !isEmpresa()) return;
+        var list = D().products.slice().sort(function(a,b){
+          var la = a.stock <= a.minStock ? 0 : 1, lb = b.stock <= b.minStock ? 0 : 1;
+          if(la !== lb) return la - lb;
+          return a.name.localeCompare(b.name);
+        });
+        $("productList").innerHTML = list.length
+          ? '<div class="item-list">' + list.map(function(pr){
+              var low = pr.stock <= pr.minStock;
+              var buy = Math.max(0, pr.minStock * 2 - pr.stock);
+              return '<div class="item">' +
+                '<span class="iicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span>' +
+                '<span class="imain"><span class="ititle">' + esc(pr.name) + '</span><br />' +
+                '<span class="imeta">' + (pr.price ? fmtEUR(pr.price) + " · " : "") + "Mínimo: " + pr.minStock + (low ? ' · <span class="stock-low">Stock bajo</span>' : "") + '</span>' +
+                (low && buy > 0 ? '<br /><span class="buy-tip">Sugerencia de compra: ' + buy + " uds. para volver a tener margen.</span>" : "") + '</span>' +
+                '<button class="btn btn-small" type="button" data-stock-delta="-1" data-id="' + pr.id + '" aria-label="Quitar una unidad">−</button>' +
+                '<span class="iamount num">' + pr.stock + ' uds.</span>' +
+                '<button class="btn btn-small" type="button" data-stock-delta="1" data-id="' + pr.id + '" aria-label="Añadir una unidad">+</button>' +
+                '<button class="icon-btn danger" type="button" data-del="product" data-id="' + pr.id + '" aria-label="Eliminar producto"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' +
+                '</div>';
+            }).join("") + '</div>'
+          : emptyBox("Sin productos todavía", "Añade tu primer producto con su stock y el mínimo a partir del cual quieres aviso.");
+      }
+
+      /* ============ Reportes de ventas (solo Empresa) ============ */
+      var repPeriod = "semana";
+      $("repPeriodSeg").addEventListener("click", function(e){
+        var b = e.target.closest("[data-period]"); if(!b) return;
+        repPeriod = b.getAttribute("data-period");
+        document.querySelectorAll("#repPeriodSeg button").forEach(function(x){
+          x.classList.toggle("on", x.getAttribute("data-period") === repPeriod);
+        });
+        renderReportes();
+      });
+      function renderReportes(){
+        if(!current || !isEmpresa()) return;
+        var area = $("reportArea"); if(!area) return;
+        var today = todayStr();
+        var from = today;
+        if(repPeriod === "semana"){
+          var d = new Date(); var dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); from = todayStr(d);
+        } else if(repPeriod === "mes") from = today.slice(0,7) + "-01";
+        var sales = D().orders.filter(function(o){ return o.status === "entregado" && o.date && o.date >= from && o.date <= today; });
+        var total = sales.reduce(function(s,o){ return s + (Number(o.amount)||0); }, 0);
+        var byDesc = {}, byClient = {};
+        sales.forEach(function(o){
+          var kd = nameKey(o.desc), kc = nameKey(o.client);
+          byDesc[kd] = byDesc[kd] || { label: o.desc, n: 0, total: 0 };
+          byDesc[kd].n++; byDesc[kd].total += Number(o.amount)||0;
+          byClient[kc] = byClient[kc] || { label: o.client, n: 0, total: 0 };
+          byClient[kc].n++; byClient[kc].total += Number(o.amount)||0;
+        });
+        var topDesc = Object.keys(byDesc).map(function(k){ return byDesc[k]; }).sort(function(a,b){ return b.n - a.n || b.total - a.total; });
+        var topClient = Object.keys(byClient).map(function(k){ return byClient[k]; }).sort(function(a,b){ return b.total - a.total; })[0];
+        var periodName = repPeriod === "dia" ? "Hoy" : repPeriod === "semana" ? "Esta semana" : "Este mes";
+        if(!sales.length){
+          area.innerHTML = emptyBox("Sin ventas entregadas en este periodo", "Cuando marques pedidos como entregados, aquí verás los totales, el producto más vendido y tu mejor cliente.");
+          return;
+        }
+        area.innerHTML =
+          '<div class="grid-stats" style="grid-template-columns:repeat(2,1fr)">' +
+          '<div class="stat"><p class="slabel">Ventas · ' + periodName + '</p><p class="svalue num">' + fmtEUR(total) + '</p><p class="ssub">' + sales.length + (sales.length === 1 ? " pedido entregado" : " pedidos entregados") + '</p></div>' +
+          '<div class="stat"><p class="slabel">Ticket medio</p><p class="svalue num">' + fmtEUR(total / sales.length) + '</p><p class="ssub">Por pedido entregado</p></div>' +
+          '<div class="stat"><p class="slabel">Producto más vendido</p><p class="svalue" style="font-size:1.15rem">' + esc(topDesc[0].label) + '</p><p class="ssub">' + topDesc[0].n + (topDesc[0].n === 1 ? " venta" : " ventas") + " · " + fmtEUR(topDesc[0].total) + '</p></div>' +
+          '<div class="stat"><p class="slabel">Cliente que más compra</p><p class="svalue" style="font-size:1.15rem">' + esc(topClient.label) + '</p><p class="ssub">' + fmtEUR(topClient.total) + " en " + topClient.n + (topClient.n === 1 ? " pedido" : " pedidos") + '</p></div>' +
+          '</div>' +
+          (topDesc.length > 1
+            ? '<div class="item-list">' + topDesc.slice(0,5).map(function(t){
+                return '<div class="item"><span class="imain"><span class="ititle">' + esc(t.label) + '</span><br /><span class="imeta">' + t.n + (t.n === 1 ? " venta" : " ventas") + '</span></span><span class="iamount num">' + fmtEUR(t.total) + '</span></div>';
+              }).join("") + '</div>'
+            : "");
+      }
+
+      /* ============ Cierre de caja (solo Empresa) ============ */
+      var cajaExpectedCash = 0;
+      function renderCaja(d){
+        var area = $("cajaArea"); if(!area) return;
+        var today = todayStr();
+        var byMethod = {};
+        d.movements.filter(function(m){ return m.date === today; }).forEach(function(m){
+          var k = m.method || "Otro";
+          byMethod[k] = byMethod[k] || { ing: 0, gas: 0 };
+          if(m.type === "ingreso") byMethod[k].ing += Number(m.amount)||0; else byMethod[k].gas += Number(m.amount)||0;
+        });
+        cajaExpectedCash = byMethod["Efectivo"] ? byMethod["Efectivo"].ing - byMethod["Efectivo"].gas : 0;
+        var methods = Object.keys(byMethod);
+        area.innerHTML = methods.length
+          ? '<div class="item-list">' + methods.map(function(k){
+              var net = byMethod[k].ing - byMethod[k].gas;
+              return '<div class="item"><span class="imain"><span class="ititle">' + esc(k) + '</span><br />' +
+                '<span class="imeta">Ingresos ' + fmtEUR(byMethod[k].ing) + " · Gastos " + fmtEUR(byMethod[k].gas) + '</span></span>' +
+                '<span class="iamount num ' + (net < 0 ? "neg" : "pos") + '">' + fmtEUR(net) + '</span></div>';
+            }).join("") + '</div>' +
+            '<p style="font-size:.9rem; color:var(--muted); margin:.6rem 0 0">Efectivo esperado en caja: <strong style="color:var(--text)">' + fmtEUR(cajaExpectedCash) + '</strong></p>'
+          : emptyBox("Sin movimientos hoy", "Cuando registres ingresos y gastos de hoy, aquí verás el cierre por método de pago.");
+      }
+      $("cajaCheckBtn").addEventListener("click", function(){
+        if(!current || !isEmpresa()) return;
+        var fb = $("cajaFeedback");
+        var counted = parseFloat($("cajaContado").value);
+        if(isNaN(counted)){ fb.className = "quick-feedback"; fb.style.color = "var(--red)"; fb.textContent = "Escribe cuánto efectivo has contado en caja."; return; }
+        var diff = counted - cajaExpectedCash;
+        fb.className = "quick-feedback"; fb.style.color = "";
+        if(Math.abs(diff) < 0.005) fb.textContent = "Cuadra perfecto: contado " + fmtEUR(counted) + ", esperado " + fmtEUR(cajaExpectedCash) + ". Diferencia: 0,00 €.";
+        else if(diff > 0) fb.textContent = "Sobra dinero: contado " + fmtEUR(counted) + ", esperado " + fmtEUR(cajaExpectedCash) + ". Diferencia: +" + fmtEUR(diff) + ". Revisa si falta algún gasto por apuntar.";
+        else fb.textContent = "Falta dinero: contado " + fmtEUR(counted) + ", esperado " + fmtEUR(cajaExpectedCash) + ". Diferencia: −" + fmtEUR(Math.abs(diff)) + ". Revisa si falta algún ingreso por apuntar.";
+      });
+
+      /* ============ Presupuestos del negocio (solo Empresa) ============ */
+      $("budgetForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || !isEmpresa()) return;
+        var amount = parseFloat($("budAmount").value);
+        var err = $("budError"); err.textContent = "";
+        if(!(amount > 0)){ err.textContent = "El límite tiene que ser mayor que cero."; return; }
+        D().budgets[$("budCategory").value] = amount;
+        persist(); renderAll();
+        $("budAmount").value = "";
+        toast("Presupuesto guardado para " + $("budCategory").value + ".");
+      });
+      function renderPresupuestos(d){
+        var el = $("budgetList"); if(!el) return;
+        var mk = todayStr().slice(0,7);
+        var cats = Object.keys(d.budgets || {});
+        el.innerHTML = cats.length
+          ? cats.map(function(c){
+              var limit = Number(d.budgets[c]) || 0;
+              var spent = d.movements.filter(function(m){ return m.type === "gasto" && m.category === c && (m.date || "").slice(0,7) === mk; })
+                .reduce(function(s,m){ return s + (Number(m.amount)||0); }, 0);
+              var pct = limit > 0 ? Math.round(spent / limit * 100) : 0;
+              var color = pct > 100 ? "var(--red)" : pct >= 80 ? "var(--amber)" : "var(--accent)";
+              return '<div class="cat-bar-row"><div class="cb-head"><span>' + esc(c) + '</span><span class="num">' + fmtEUR(spent) + " de " + fmtEUR(limit) + " · " + pct + " %" +
+                (pct > 100 ? " · Te has pasado" : pct >= 80 ? " · Ojo, casi al límite" : "") + '</span></div>' +
+                '<div class="cat-bar"><div style="width:' + Math.min(100, pct) + '%; background:' + color + '"></div></div>' +
+                '<button class="link-btn" type="button" data-del-budget="' + esc(c) + '" style="padding:.15rem 0; min-height:0; font-size:.8rem">Quitar presupuesto</button></div>';
+            }).join("")
+          : emptyBox("Sin presupuestos todavía", "Pon el primer límite arriba: elige categoría e importe mensual.");
+      }
+
+      /* ============ Deudas de clientes (solo Empresa) ============ */
+      $("debtForm").addEventListener("submit", function(e){
+        e.preventDefault();
+        if(!current || !isEmpresa()) return;
+        var client = $("debtClient").value.trim();
+        var amount = parseFloat($("debtAmount").value);
+        var date = $("debtDate").value;
+        var err = $("debtError"); err.textContent = "";
+        if(!client){ err.textContent = "Escribe el cliente que debe."; return; }
+        if(!(amount > 0)){ err.textContent = "El importe tiene que ser mayor que cero."; return; }
+        if(!date){ err.textContent = "Elige desde cuándo debe."; return; }
+        D().debts.push({ id: uid(), client: client, amount: amount, date: date,
+          notes: $("debtNotes").value.trim(), paid: false });
+        if(!clientByName(client)) D().clients.push({ id: uid(), name: client, phone: "", email: "", notes: "" });
+        persist(); renderAll();
+        $("debtForm").reset(); $("debtDate").value = todayStr();
+        toast("Deuda apuntada: " + client + " debe " + fmtEUR(amount) + ".");
+      });
+      function debtWaText(db){
+        return "Hola " + db.client + ", te escribo de " + current.name + ". Te recuerdo que tienes pendiente un pago de " + fmtEUR(db.amount) +
+          " desde el " + fmtDate(db.date) + (db.notes ? " (" + db.notes + ")" : "") + ". Cuando puedas, dime cuándo lo dejamos cerrado. ¡Gracias!";
+      }
+      function renderDebts(){
+        if(!current || !isEmpresa()) return;
+        var open = D().debts.filter(function(db){ return !db.paid; })
+          .sort(function(a,b){ return a.date.localeCompare(b.date); });
+        var paid = D().debts.filter(function(db){ return db.paid; })
+          .sort(function(a,b){ return b.date.localeCompare(a.date); });
+        var total = open.reduce(function(s,db){ return s + (Number(db.amount)||0); }, 0);
+        $("debtSummary").textContent = open.length
+          ? "Total pendiente de cobro: " + fmtEUR(total) + " · " + open.length + (open.length === 1 ? " deuda abierta" : " deudas abiertas")
+          : "";
+        var row = function(db){
+          var cli = clientByName(db.client);
+          var days = daysSince(db.date);
+          return '<div class="item' + (db.paid ? " done" : "") + '">' +
+            '<span class="iicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>' +
+            '<span class="imain"><span class="ititle">' + esc(db.client) + '</span><br />' +
+            '<span class="imeta">' + (db.paid ? "Pagada" : "Desde el " + fmtDate(db.date) + " · hace " + days + (days === 1 ? " día" : " días")) + (db.notes ? " · " + esc(db.notes) : "") + '</span></span>' +
+            '<span class="iamount num ' + (db.paid ? "" : "neg") + '">' + fmtEUR(db.amount) + '</span>' +
+            (db.paid ? "" :
+              '<a class="btn btn-small btn-wa" target="_blank" rel="noopener" href="' + waHref(cli ? cli.phone : "", debtWaText(db)) + '">Recordar por WhatsApp</a>' +
+              '<button class="btn btn-small" type="button" data-debt-paid="' + db.id + '">Marcar pagada</button>') +
+            '<button class="icon-btn danger" type="button" data-del="debt" data-id="' + db.id + '" aria-label="Eliminar deuda"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>' +
+            '</div>';
+        };
+        $("debtList").innerHTML = (open.length || paid.length)
+          ? '<div class="item-list">' + open.map(row).join("") + paid.map(row).join("") + '</div>'
+          : emptyBox("Sin deudas apuntadas", "Si un cliente te queda a deber, apúntalo aquí y lo tendrás controlado.");
+      }
+
+      /* Delegación extra: stock, tickets, presupuestos, metas, gastos
+         fijos y deudas. Vive aparte de la delegación general para no
+         tocar su lógica de borrado con «Deshacer», que estas acciones
+         reutilizan tal cual vía data-del. */
+      document.addEventListener("click", function(e){
+        if(!current) return;
+        var sd = e.target.closest("[data-stock-delta]");
+        if(sd && isEmpresa()){
+          var pr = D().products.find(function(x){ return x.id === sd.getAttribute("data-id"); });
+          if(pr){ pr.stock = Math.max(0, pr.stock + Number(sd.getAttribute("data-stock-delta"))); persist(); renderAll(); }
+          return;
+        }
+        var tk = e.target.closest("[data-ticket]");
+        if(tk && isEmpresa()){
+          var o = D().orders.find(function(x){ return x.id === tk.getAttribute("data-ticket"); });
+          if(o) downloadTicket(o);
+          return;
+        }
+        var bd = e.target.closest("[data-del-budget]");
+        if(bd && isEmpresa()){
+          delete D().budgets[bd.getAttribute("data-del-budget")];
+          persist(); renderAll();
+          toast("Presupuesto eliminado.");
+          return;
+        }
+        var ga = e.target.closest("[data-goal-add]");
+        if(ga && !isEmpresa()){
+          var g = D().goals.find(function(x){ return x.id === ga.getAttribute("data-goal-add"); });
+          var inp = $("goalAmt-" + ga.getAttribute("data-goal-add"));
+          var v = inp ? parseFloat(inp.value) : NaN;
+          if(g && v > 0){
+            g.saved = Math.min(g.target, g.saved + v);
+            persist(); renderAll();
+            toast(g.saved >= g.target ? "¡Meta conseguida! " + g.name + " ya está completa." : "Aportados " + fmtEUR(v) + " a «" + g.name + "».");
+          } else toast("Escribe cuánto quieres aportar.");
+          return;
+        }
+        var fe = e.target.closest("[data-fixed-edit]");
+        if(fe && !isEmpresa()){
+          var f = D().fixed.find(function(x){ return x.id === fe.getAttribute("data-fixed-edit"); });
+          if(f){
+            editingFixedId = f.id;
+            $("fixedConcept").value = f.concept;
+            $("fixedAmount").value = f.amount;
+            $("fixedCategory").value = f.category;
+            $("fixedMethod").value = f.method;
+            $("fixedDay").value = f.day;
+            $("fixedError").textContent = "";
+            $("fixedSubmitBtn").textContent = "Guardar cambios";
+            $("fixedCancelEdit").hidden = false;
+            $("fixedForm").scrollIntoView({ behavior: "smooth", block: "start" });
+            setTimeout(function(){ $("fixedConcept").focus(); }, 60);
+          }
+          return;
+        }
+        var fo = e.target.closest("[data-fixed-off]");
+        if(fo && !isEmpresa()){
+          var f2 = D().fixed.find(function(x){ return x.id === fo.getAttribute("data-fixed-off"); });
+          if(f2){
+            f2.active = !f2.active;
+            persist(); renderAll();
+            toast(f2.active ? "Gasto fijo reactivado: volverá a registrarse solo." : "Gasto fijo cancelado: ya no se registrará más.");
+          }
+          return;
+        }
+        var dp = e.target.closest("[data-debt-paid]");
+        if(dp && isEmpresa()){
+          var db = D().debts.find(function(x){ return x.id === dp.getAttribute("data-debt-paid"); });
+          if(db){ db.paid = true; persist(); renderAll(); toast("Deuda de " + db.client + " marcada como pagada."); }
+          return;
+        }
+      });
+      /* Cambio de estado de un pedido: se guarda al momento y se
+         sugiere avisar al cliente con el botón de WhatsApp del propio
+         pedido, que ya lleva el mensaje con el estado nuevo. */
+      document.addEventListener("change", function(e){
+        var sel = e.target.closest("[data-order-status]");
+        if(!sel || !current || !isEmpresa()) return;
+        var o = D().orders.find(function(x){ return x.id === sel.getAttribute("data-order-status"); });
+        if(o && o.status !== sel.value){
+          o.status = sel.value;
+          persist(); renderAll();
+          toast("Pedido de " + o.client + " ahora está: " + o.status + ". Pulsa «Avisar estado por WhatsApp» en el pedido para decírselo al cliente.");
+        }
+      });
+
       /* ============ Borrar / alternar (delegación) ============ */
       document.addEventListener("click", function(e){
         var edm = e.target.closest("[data-edit-movement]");
@@ -1889,7 +2947,9 @@
         var del = e.target.closest("[data-del]");
         if(del && current){
           var kind = del.getAttribute("data-del"), id = del.getAttribute("data-id");
-          var key = kind === "movement" ? "movements" : kind === "document" ? "documents" : kind === "reminder" ? "reminders" : "investments";
+          var key = kind === "movement" ? "movements" : kind === "document" ? "documents" : kind === "reminder" ? "reminders" :
+                    kind === "client" ? "clients" : kind === "order" ? "orders" : kind === "product" ? "products" :
+                    kind === "goal" ? "goals" : kind === "fixed" ? "fixed" : kind === "debt" ? "debts" : "investments";
           var arr = D()[key];
           var idx = arr.findIndex(function(x){ return x.id === id; });
           if(idx === -1) return;
@@ -2301,6 +3361,29 @@
           if((i.name + " " + i.kind).toLowerCase().indexOf(q) !== -1)
             hits.push({ tag: "Inversión", label: i.name, view: "inversiones" });
         });
+        if(isEmpresa()){
+          d.clients.forEach(function(c){
+            if((c.name + " " + (c.phone||"") + " " + (c.email||"")).toLowerCase().indexOf(q) !== -1)
+              hits.push({ tag: "Cliente", label: c.name, view: "clientes" });
+          });
+          d.orders.forEach(function(o){
+            if((o.desc + " " + o.client).toLowerCase().indexOf(q) !== -1)
+              hits.push({ tag: "Pedido", label: o.desc + " · " + o.client, view: "pedidos" });
+          });
+          d.products.forEach(function(pr){
+            if(pr.name.toLowerCase().indexOf(q) !== -1)
+              hits.push({ tag: "Producto", label: pr.name + " · " + pr.stock + " uds.", view: "inventario" });
+          });
+          d.debts.forEach(function(db){
+            if(!db.paid && db.client.toLowerCase().indexOf(q) !== -1)
+              hits.push({ tag: "Deuda", label: db.client + " debe " + fmtEUR(db.amount), view: "clientes" });
+          });
+        } else {
+          d.goals.forEach(function(g){
+            if(g.name.toLowerCase().indexOf(q) !== -1)
+              hits.push({ tag: "Meta", label: g.name + " · " + fmtEUR(g.saved) + " de " + fmtEUR(g.target), view: "metas" });
+          });
+        }
         box.innerHTML = hits.length
           ? hits.slice(0, 12).map(function(h){
               return '<button type="button" data-goto="' + h.view + '"><span class="tag">' + esc(h.tag) + '</span><span>' + esc(h.label) + '</span></button>';
@@ -2384,6 +3467,64 @@
             return "<tr><td>" + esc(i.name || "—") + "</td><td>" + esc(i.kind || "—") + '</td><td class="num">' + esc(String(qty).replace(".", ",")) + '</td><td class="num">' + esc(fmtEUR(buy)) + '</td><td class="num">' + esc(fmtEUR(now)) + '</td><td class="num">' + esc(fmtEUR(val)) + '</td><td class="num ' + (res > 0 ? "pos" : (res < 0 ? "neg" : "")) + '">' + (res > 0 ? "+" : "") + esc(fmtEUR(res)) + "</td></tr>";
           }).join("");
         }
+        /* La cola del informe depende del tipo de perfil: Personal
+           cierra con Inversiones; Empresa con Clientes, Pedidos e
+           Inventario. Un tipo nunca exporta las secciones del otro. */
+        var isEmp = payload.profileType === "empresa";
+        function cliRows(){
+          if(!data.clients.length) return '<tr><td colspan="4" class="empty-cell">Sin registros</td></tr>';
+          return data.clients.map(function(c){
+            return "<tr><td>" + esc(c.name || "—") + "</td><td>" + esc(c.phone || "—") + "</td><td>" + esc(c.email || "—") + "</td><td>" + esc(c.notes || "—") + "</td></tr>";
+          }).join("");
+        }
+        function ordRows(){
+          if(!data.orders.length) return '<tr><td colspan="5" class="empty-cell">Sin registros</td></tr>';
+          return data.orders.map(function(o){
+            return "<tr><td>" + esc(o.client || "—") + "</td><td>" + esc(o.desc || "—") + "</td><td>" + esc(o.date ? fmtDate(o.date) : "—") + '</td><td><span class="badge b-pend">' + esc(o.status || "pendiente") + '</span></td><td class="num">' + esc(fmtEUR(o.amount)) + "</td></tr>";
+          }).join("");
+        }
+        function prodRows(){
+          if(!data.products.length) return '<tr><td colspan="4" class="empty-cell">Sin registros</td></tr>';
+          return data.products.map(function(pr){
+            return "<tr><td>" + esc(pr.name || "—") + '</td><td class="num">' + pr.stock + '</td><td class="num">' + pr.minStock + '</td><td class="num">' + esc(fmtEUR(pr.price)) + "</td></tr>";
+          }).join("");
+        }
+        function debtRows(){
+          if(!data.debts.length) return '<tr><td colspan="5" class="empty-cell">Sin registros</td></tr>';
+          return data.debts.map(function(db){
+            return "<tr><td>" + esc(db.client || "—") + '</td><td class="num">' + esc(fmtEUR(db.amount)) + "</td><td>" + esc(db.date ? fmtDate(db.date) : "—") + "</td><td>" + esc(db.notes || "—") + '</td><td><span class="badge ' + (db.paid ? "b-done" : "b-pend") + '">' + (db.paid ? "Pagada" : "Pendiente") + "</span></td></tr>";
+          }).join("");
+        }
+        function goalRows(){
+          if(!data.goals.length) return '<tr><td colspan="4" class="empty-cell">Sin registros</td></tr>';
+          return data.goals.map(function(g){
+            var pct = g.target > 0 ? Math.min(100, Math.round(g.saved / g.target * 100)) : 0;
+            return "<tr><td>" + esc(g.name || "—") + '</td><td class="num">' + esc(fmtEUR(g.target)) + '</td><td class="num">' + esc(fmtEUR(g.saved)) + " (" + pct + ' %)</td><td>' + esc(g.deadline ? fmtDate(g.deadline) : "Sin fecha") + "</td></tr>";
+          }).join("");
+        }
+        function fixedRows(){
+          if(!data.fixed.length) return '<tr><td colspan="5" class="empty-cell">Sin registros</td></tr>';
+          return data.fixed.map(function(f){
+            return "<tr><td>" + esc(f.concept || "—") + '</td><td class="num">' + esc(fmtEUR(f.amount)) + "</td><td>Día " + f.day + " de cada mes</td><td>" + esc(f.category || "—") + '</td><td><span class="badge ' + (f.active ? "b-pend" : "b-done") + '">' + (f.active ? "Activo" : "Cancelado") + "</span></td></tr>";
+          }).join("");
+        }
+        var tailSections = isEmp
+          ? "<h2>Clientes</h2><p class=\"sub\">Los clientes de tu negocio.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Notas</th></tr></thead><tbody>" + cliRows() + "</tbody></table></div>\n" +
+            "<h2>Pedidos</h2><p class=\"sub\">Los pedidos del negocio, con su estado.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Cliente</th><th>Pedido</th><th>Entrega</th><th>Estado</th><th class=\"num\">Importe</th></tr></thead><tbody>" + ordRows() + "</tbody></table></div>\n" +
+            "<h2>Inventario</h2><p class=\"sub\">Productos y stock del negocio.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Producto</th><th class=\"num\">Stock</th><th class=\"num\">Mínimo</th><th class=\"num\">Precio</th></tr></thead><tbody>" + prodRows() + "</tbody></table></div>\n" +
+            "<h2>Deudas de clientes</h2><p class=\"sub\">Quién debe qué al negocio y desde cuándo.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Cliente</th><th class=\"num\">Importe</th><th>Desde</th><th>Notas</th><th>Estado</th></tr></thead><tbody>" + debtRows() + "</tbody></table></div>\n"
+          : "<h2>Inversiones</h2><p class=\"sub\">Tus posiciones con los precios que apuntaste en ORDENIA.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Nombre</th><th>Tipo</th><th class=\"num\">Cantidad</th><th class=\"num\">Precio compra</th><th class=\"num\">Precio actual</th><th class=\"num\">Valor actual</th><th class=\"num\">Resultado</th></tr></thead><tbody>" + invRows() + "</tbody>" +
+            (data.investments.length ? "<tfoot><tr><td colspan=\"5\">Totales — Invertido: " + esc(fmtEUR(invInvertido)) + "</td><td class=\"num\">" + esc(fmtEUR(invValor)) + "</td><td class=\"num " + (invResultado > 0 ? "pos" : (invResultado < 0 ? "neg" : "")) + "\">" + (invResultado > 0 ? "+" : "") + esc(fmtEUR(invResultado)) + "</td></tr></tfoot>" : "") +
+            "</table></div>\n" +
+            "<h2>Metas de ahorro</h2><p class=\"sub\">Tus metas y su progreso.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Meta</th><th class=\"num\">Objetivo</th><th class=\"num\">Ahorrado</th><th>Fecha límite</th></tr></thead><tbody>" + goalRows() + "</tbody></table></div>\n" +
+            "<h2>Gastos fijos automáticos</h2><p class=\"sub\">Los gastos que se registran solos cada mes.</p>" +
+            "<div class=\"table-wrap\"><table><thead><tr><th>Concepto</th><th class=\"num\">Importe</th><th>Cuándo</th><th>Categoría</th><th>Estado</th></tr></thead><tbody>" + fixedRows() + "</tbody></table></div>\n";
         var safeJson = JSON.stringify(payload).replace(/</g, "\\u003c");
         var css =
           "*{box-sizing:border-box}body{margin:0;background:#f6f5fb;color:#17122b;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;line-height:1.5}" +
@@ -2412,7 +3553,9 @@
           "<div class=\"sum\"><div class=\"k\">Total ingresos</div><div class=\"v pos\">" + esc(fmtEUR(tIng)) + "</div></div>" +
           "<div class=\"sum\"><div class=\"k\">Total gastos</div><div class=\"v neg\">" + esc(fmtEUR(tGas)) + "</div></div>" +
           "<div class=\"sum\"><div class=\"k\">Movimientos</div><div class=\"v\">" + movs.length + "</div></div>" +
-          "<div class=\"sum\"><div class=\"k\">Valor inversiones</div><div class=\"v\">" + esc(fmtEUR(invValor)) + "</div></div>" +
+          (isEmp
+            ? "<div class=\"sum\"><div class=\"k\">Clientes</div><div class=\"v\">" + data.clients.length + "</div></div>"
+            : "<div class=\"sum\"><div class=\"k\">Valor inversiones</div><div class=\"v\">" + esc(fmtEUR(invValor)) + "</div></div>") +
           "</section>\n" +
           "<h2>Movimientos</h2><p class=\"sub\">Todos tus ingresos y gastos registrados, del más reciente al más antiguo.</p>" +
           "<div class=\"table-wrap\"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Categoría</th><th>Método</th><th class=\"num\">Importe</th></tr></thead><tbody>" + movRows() + "</tbody>" +
@@ -2422,16 +3565,13 @@
           "<div class=\"table-wrap\"><table><thead><tr><th>Documento</th><th>Tipo</th><th>Fecha</th><th>Dónde está guardado</th><th>Notas</th></tr></thead><tbody>" + docRows() + "</tbody></table></div>\n" +
           "<h2>Recordatorios</h2><p class=\"sub\">Tus recordatorios, con su estado.</p>" +
           "<div class=\"table-wrap\"><table><thead><tr><th>Recordatorio</th><th>Fecha</th><th>Hora</th><th>Notas</th><th>Estado</th></tr></thead><tbody>" + remRows() + "</tbody></table></div>\n" +
-          "<h2>Inversiones</h2><p class=\"sub\">Tus posiciones con los precios que apuntaste en ORDENIA.</p>" +
-          "<div class=\"table-wrap\"><table><thead><tr><th>Nombre</th><th>Tipo</th><th class=\"num\">Cantidad</th><th class=\"num\">Precio compra</th><th class=\"num\">Precio actual</th><th class=\"num\">Valor actual</th><th class=\"num\">Resultado</th></tr></thead><tbody>" + invRows() + "</tbody>" +
-          (data.investments.length ? "<tfoot><tr><td colspan=\"5\">Totales — Invertido: " + esc(fmtEUR(invInvertido)) + "</td><td class=\"num\">" + esc(fmtEUR(invValor)) + "</td><td class=\"num " + (invResultado > 0 ? "pos" : (invResultado < 0 ? "neg" : "")) + "\">" + (invResultado > 0 ? "+" : "") + esc(fmtEUR(invResultado)) + "</td></tr></tfoot>" : "") +
-          "</table></div>\n" +
+          tailSections +
           "<footer>Generado por ORDENIA pública para " + esc(profile) + ". Tus datos viven solo en tu dispositivo; este archivo es la copia legible que tú decides guardar o compartir.</footer>\n" +
           "</div>\n<script type=\"application/json\" id=\"ordenia-export-data\">" + safeJson + "<\/script>\n</body>\n</html>";
       }
       $("exportBtn").addEventListener("click", function(){
         if(!current) return;
-        var payload = { app: "ORDENIA pública", version: 2, profile: current.name,
+        var payload = { app: "ORDENIA pública", version: 2, profile: current.name, profileType: profileType(current),
           exportedAt: new Date().toISOString(), data: D() };
         var html = buildReportHTML(payload);
         var blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -2482,7 +3622,7 @@
         persist(); renderAll();
         var fb = $("importFeedback");
         fb.className = "quick-feedback ok"; fb.style.color = "";
-        fb.textContent = "Datos restaurados: ahora este perfil muestra los movimientos, documentos, recordatorios e inversiones del archivo.";
+        fb.textContent = "Datos restaurados: ahora este perfil muestra los datos del archivo.";
         toast("Datos restaurados correctamente.");
       });
       $("cancelImport").addEventListener("click", function(){
@@ -2503,10 +3643,15 @@
             var parsed = parseExportFile(reader.result);
             var candidate = parsed && parsed.data ? parsed.data : parsed;
             var hasData = candidate && typeof candidate === "object" &&
-              ["movements","documents","reminders","investments"].some(function(k){ return Array.isArray(candidate[k]); });
+              ["movements","documents","reminders","investments","clients","orders","products","goals","fixed","debts"].some(function(k){ return Array.isArray(candidate[k]); });
             if(!hasData) throw new Error("formato");
             pendingImport = normalizeData(candidate);
-            var countTxt = function(dd){ return dd.movements.length + " movimientos, " + dd.documents.length + " documentos, " + dd.reminders.length + " recordatorios y " + dd.investments.length + " inversiones"; };
+            var countTxt = function(dd){
+              var t = dd.movements.length + " movimientos, " + dd.documents.length + " documentos y " + dd.reminders.length + " recordatorios";
+              if(isEmpresa()) t += ", " + dd.clients.length + " clientes, " + dd.orders.length + " pedidos, " + dd.products.length + " productos y " + dd.debts.length + " deudas";
+              else t += ", " + dd.investments.length + " inversiones, " + dd.goals.length + " metas y " + dd.fixed.length + " gastos fijos";
+              return t;
+            };
             $("importConfirmText").innerHTML = "<strong>Restaurar sustituirá los datos actuales de este perfil.</strong><br />El archivo trae " + esc(countTxt(pendingImport)) + ".<br />Ahora tienes " + esc(countTxt(normalizeData(current.data))) + ". Lo actual se perderá si no lo has descargado antes.";
             fb.className = "quick-feedback"; fb.style.color = "";
             fb.textContent = "Confirma la restauración en la ventana que se ha abierto.";
